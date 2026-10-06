@@ -1,0 +1,1242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>3D Voxel Virtual Date - Multiplayer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Cannon.js CDN for Physics Engine Integration -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <!-- Colyseus.js CDN for Real-Time Multiplayer Networking -->
+    <script src="https://unpkg.com/colyseus.js@^0.15.0/dist/colyseus.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+      #canvas-container {
+        width: 100vw;
+        height: 100vh;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+      .speech-bubble {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.95);
+        color: #1e293b;
+        padding: 8px 14px;
+        border-radius: 18px;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        transform: translate(-50%, -100%);
+        transition:
+          opacity 0.3s ease,
+          transform 0.1s ease-out;
+        white-space: nowrap;
+        max-width: 220px;
+        z-index: 10;
+      }
+      .speech-bubble::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 8px 8px 0;
+        border-style: solid;
+        border-color: rgba(255, 255, 255, 0.95) transparent;
+        display: block;
+        width: 0;
+      }
+      .joystick-container {
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-900 text-white overflow-hidden">
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- Overhead Speech Bubbles Container -->
+    <div
+      id="speech-bubbles-container"
+      class="absolute inset-0 pointer-events-none z-10"
+    ></div>
+
+    <!-- Welcome / Character Selection Modal -->
+    <div
+      id="welcome-modal"
+      class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-slate-900 border border-pink-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl shadow-pink-500/10 text-center relative overflow-hidden"
+      >
+        <div
+          class="absolute -top-12 -right-12 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"
+        ></div>
+        <div
+          class="absolute -bottom-12 -left-12 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"
+        ></div>
+
+        <div
+          class="w-16 h-16 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-pink-500/30"
+        >
+          <i class="fa-solid fa-heart text-2xl text-white"></i>
+        </div>
+
+        <h1
+          class="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-pink-400 via-purple-300 to-pink-500 bg-clip-text text-transparent mb-2"
+        >
+          Voxel Virtual Date
+        </h1>
+        <p class="text-slate-400 text-sm mb-6">
+          Explore a cozy romantic voxel world together in real-time.
+        </p>
+
+        <!-- Avatar Selection -->
+        <div class="mb-6">
+          <label
+            class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3"
+            >Choose Your Character Style</label
+          >
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              id="select-female-btn"
+              class="avatar-select-btn border-2 border-pink-500 bg-pink-500/20 text-pink-300 rounded-2xl p-3 flex flex-col items-center justify-center transition"
+            >
+              <i class="fa-solid fa-person-dress text-2xl mb-1"></i>
+              <span class="text-xs font-bold">Pink Style</span>
+            </button>
+            <button
+              id="select-male-btn"
+              class="avatar-select-btn border-2 border-slate-700 bg-slate-800 text-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center transition"
+            >
+              <i class="fa-solid fa-person text-2xl mb-1"></i>
+              <span class="text-xs font-bold">Purple Style</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Room Setup -->
+        <div class="mb-6 text-left">
+          <label
+            class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2"
+            >Multiplayer Room</label
+          >
+          <div class="flex gap-2">
+            <input
+              type="text"
+              id="room-id-input"
+              value="play_room"
+              placeholder="Enter Room Code"
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-pink-300 focus:outline-none focus:border-pink-500 transition"
+            />
+            <button
+              id="gen-room-btn"
+              class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1 shrink-0"
+            >
+              <i class="fa-solid fa-dice"></i>
+              <span>Random</span>
+            </button>
+          </div>
+        </div>
+
+        <button
+          id="start-date-btn"
+          class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold text-sm shadow-lg shadow-pink-500/25 transition active:scale-95 flex items-center justify-center gap-2"
+        >
+          <span>Enter World Together</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div
+      id="hud"
+      class="hidden absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-4 sm:p-6"
+    >
+      <!-- Top Bar -->
+      <div class="flex justify-between items-start pointer-events-auto">
+        <div
+          class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-xl"
+        >
+          <div class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
+          <div
+            class="text-xs font-semibold text-slate-300"
+            id="connection-status"
+          >
+            Connected:
+            <span class="text-pink-400 font-mono" id="room-code-display"
+              >play_room</span
+            >
+          </div>
+        </div>
+
+        <!-- Timer & Controls -->
+        <div class="flex items-center gap-2">
+          <div
+            class="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl px-4 py-2 flex items-center gap-2 shadow-xl"
+          >
+            <i class="fa-solid fa-clock text-pink-400 text-sm"></i>
+            <!-- <span
+              id="timer-display"
+              class="font-mono text-sm font-bold text-white"
+              >10:00</span
+            > -->
+            <span
+              id="timer-display"
+              class="font-mono text-sm font-bold text-white"
+              >02:00</span
+            >
+          </div>
+
+          <button
+            id="mic-toggle-btn"
+            class="w-10 h-10 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl flex items-center justify-center text-slate-300 hover:text-white transition shadow-xl"
+            title="Toggle Voice Input"
+          >
+            <i
+              id="mic-icon"
+              class="fa-solid fa-microphone-slash text-rose-400 text-sm"
+            ></i>
+          </button>
+
+          <button
+            id="sound-toggle-btn"
+            class="w-10 h-10 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl flex items-center justify-center text-slate-300 hover:text-white transition shadow-xl"
+            title="Toggle Audio"
+          >
+            <i
+              id="sound-icon"
+              class="fa-solid fa-volume-high text-pink-400 text-sm"
+            ></i>
+          </button>
+
+          <button
+            id="prompt-btn"
+            class="w-10 h-10 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-2xl flex items-center justify-center text-white transition shadow-xl shadow-pink-500/20 active:scale-95"
+            title="Date Prompts Deck"
+          >
+            <i class="fa-solid fa-comments text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Date Conversation Deck Modal -->
+      <div
+        id="prompt-card"
+        class="hidden pointer-events-auto self-center max-w-sm w-full bg-slate-900/90 backdrop-blur-md border border-pink-500/40 rounded-2xl p-5 shadow-2xl relative"
+      >
+        <button
+          id="close-prompt-btn"
+          class="absolute top-3 right-3 text-slate-400 hover:text-white text-xs"
+        >
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+        <div
+          class="text-xs font-bold text-pink-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"
+        >
+          <i class="fa-solid fa-sparkles"></i>
+          <span>Conversation Topic</span>
+        </div>
+        <p
+          id="prompt-text"
+          class="text-sm font-medium text-slate-200 mb-4 leading-relaxed italic"
+        >
+          "What is your favorite memory of us together?"
+        </p>
+        <button
+          id="next-prompt-btn"
+          class="w-full py-2 bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/40 rounded-xl text-pink-300 font-semibold text-xs transition"
+        >
+          Next Prompt <i class="fa-solid fa-shuffle ml-1"></i>
+        </button>
+      </div>
+
+      <!-- Mobile Touch Joystick & Bottom Bar -->
+      <div class="flex justify-between items-end pointer-events-none">
+        <!-- Touch Joystick Container -->
+        <div
+          id="joystick-zone"
+          class="pointer-events-auto w-28 h-28 bg-slate-900/40 backdrop-blur-sm border border-slate-700/50 rounded-full relative flex items-center justify-center hidden sm:hidden"
+        >
+          <div
+            id="joystick-knob"
+            class="w-12 h-12 bg-pink-500/80 rounded-full shadow-lg absolute"
+          ></div>
+        </div>
+
+        <!-- Chat / Speech Bar -->
+        <div class="pointer-events-auto w-full max-w-md mx-auto flex gap-2">
+          <div class="relative w-full">
+            <input
+              type="text"
+              id="speech-text-input"
+              placeholder="Say something romantic..."
+              class="w-full bg-slate-900/90 backdrop-blur-md border border-slate-700/80 focus:border-pink-500 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none shadow-xl transition"
+            />
+            <span
+              id="mic-status"
+              class="absolute right-3 top-3 text-[10px] text-slate-500 font-semibold uppercase"
+              >Mic Off</span
+            >
+          </div>
+          <button
+            id="send-chat-btn"
+            class="bg-pink-500 hover:bg-pink-600 text-white px-5 rounded-2xl font-bold text-sm shadow-lg shadow-pink-500/25 transition active:scale-95 flex items-center justify-center shrink-0"
+          >
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Logic Script -->
+    <script>
+      // Global State
+      const STATE = {
+        gender: "female",
+        roomId: "play_room",
+        timeRemaining: 120, //600,
+        timerInterval: null,
+        audioMuted: false,
+        isMobile:
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent,
+          ),
+      };
+
+      const DATE_PROMPTS = [
+        "What is your favorite memory of us together?",
+        "If we could teleport anywhere in the world right now, where would we go?",
+        "What was your very first impression of me?",
+        "What is a small habit of mine that makes you smile?",
+        "If our love story was a movie, what genre would it be?",
+        "What is your idea of a perfect cozy weekend date?",
+      ];
+      let currentPromptIndex = 0;
+
+      // Colyseus Network State
+      let colyseusClient = null;
+      let colyseusRoom = null;
+      const remoteAvatars = {};
+
+      // DOM Elements
+      const welcomeModal = document.getElementById("welcome-modal");
+      const selectFemaleBtn = document.getElementById("select-female-btn");
+      const selectMaleBtn = document.getElementById("select-male-btn");
+      const roomIdInput = document.getElementById("room-id-input");
+      const genRoomBtn = document.getElementById("gen-room-btn");
+      const startDateBtn = document.getElementById("start-date-btn");
+      const hud = document.getElementById("hud");
+      const roomCodeDisplay = document.getElementById("room-code-display");
+      const connectionStatus = document.getElementById("connection-status");
+      const timerDisplay = document.getElementById("timer-display");
+      const micToggleBtn = document.getElementById("mic-toggle-btn");
+      const micIcon = document.getElementById("mic-icon");
+      const micStatus = document.getElementById("mic-status");
+      const soundToggleBtn = document.getElementById("sound-toggle-btn");
+      const soundIcon = document.getElementById("sound-icon");
+      const promptBtn = document.getElementById("prompt-btn");
+      const promptCard = document.getElementById("prompt-card");
+      const closePromptBtn = document.getElementById("close-prompt-btn");
+      const promptText = document.getElementById("prompt-text");
+      const nextPromptBtn = document.getElementById("next-prompt-btn");
+      const speechTextInput = document.getElementById("speech-text-input");
+      const sendChatBtn = document.getElementById("send-chat-btn");
+      const joystickZone = document.getElementById("joystick-zone");
+      const joystickKnob = document.getElementById("joystick-knob");
+      const speechContainer = document.getElementById(
+        "speech-bubbles-container",
+      );
+
+      if (STATE.isMobile) {
+        joystickZone.classList.remove("hidden");
+      }
+
+      // Web Audio Synthesizer
+      class SoundEngine {
+        constructor() {
+          this.ctx = null;
+        }
+        init() {
+          if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+        }
+        playChime() {
+          if (STATE.audioMuted || !this.ctx) return;
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(523.25, now); // C5
+          osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.5); // C6
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.5);
+        }
+        playPop() {
+          if (STATE.audioMuted || !this.ctx) return;
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.exponentialRampToValueAtTime(150, now + 0.1);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.1);
+        }
+      }
+      const soundEngine = new SoundEngine();
+
+      // Web Speech API Integration
+      class SpeechHandler {
+        constructor() {
+          this.recognition = null;
+          this.isListening = false;
+          this.init();
+        }
+        init() {
+          const SpeechRecognition =
+            window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SpeechRecognition) {
+            this.recognition = new SpeechRecognition();
+            this.recognition.continuous = true;
+            this.recognition.interimResults = true;
+            this.recognition.lang = "en-US";
+
+            this.recognition.onresult = (e) => {
+              let transcript = "";
+              for (let i = e.resultIndex; i < e.results.length; i++) {
+                transcript += e.results[i][0].transcript;
+              }
+              speechTextInput.value = transcript;
+            };
+
+            this.recognition.onerror = () => {
+              this.stop();
+            };
+          }
+        }
+        toggle() {
+          if (!this.recognition) {
+            alert("Speech Recognition is not supported in this browser.");
+            return false;
+          }
+          if (this.isListening) {
+            this.stop();
+            return false;
+          } else {
+            this.start();
+            return true;
+          }
+        }
+        start() {
+          if (this.recognition && !this.isListening) {
+            this.recognition.start();
+            this.isListening = true;
+          }
+        }
+        stop() {
+          if (this.recognition && this.isListening) {
+            this.recognition.stop();
+            this.isListening = false;
+          }
+        }
+      }
+      const speechHandler = new SpeechHandler();
+
+      // Three.js & Cannon.js Physics Engine
+      let scene, camera, renderer, clock;
+      let world, playerBody;
+      let playerAvatar, partnerAvatar;
+      const keys = { w: false, a: false, s: false, d: false };
+      let joystickMove = { x: 0, y: 0 };
+      let yaw = 0,
+        pitch = 0.2;
+      let isGrounded = true;
+      let moveVector = new THREE.Vector3();
+      let playerVelocity = new THREE.Vector3();
+
+      function initPhysics() {
+        world = new CANNON.World();
+        world.gravity.set(0, -22, 0);
+        world.broadphase = new CANNON.NaiveBroadphase();
+        world.solver.iterations = 10;
+
+        // Ground physics plane
+        const groundShape = new CANNON.Plane();
+        const groundBody = new CANNON.Body({ mass: 0 });
+        groundBody.addShape(groundShape);
+        groundBody.quaternion.setFromAxisAngle(
+          new CANNON.Vec3(1, 0, 0),
+          -Math.PI / 2,
+        );
+        world.addBody(groundBody);
+
+        // Player physics sphere body
+        const radius = 0.5;
+        const sphereShape = new CANNON.Sphere(radius);
+        playerBody = new CANNON.Body({ mass: 5, shape: sphereShape });
+        playerBody.position.set(0, 2, 5);
+        playerBody.linearDamping = 0.9;
+        world.addBody(playerBody);
+      }
+
+      function initThreeScene() {
+        clock = new THREE.Clock();
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xa5f3fc); // Cozy Sky Blue
+        scene.fog = new THREE.FogExp2(0xa5f3fc, 0.015);
+
+        camera = new THREE.PerspectiveCamera(
+          60,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000,
+        );
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document
+          .getElementById("canvas-container")
+          .appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfff7ed, 0.9);
+        dirLight.position.set(30, 50, 20);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 150;
+        const d = 30;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        initPhysics();
+        generateVoxelWorld();
+        createAvatars();
+        setupControls();
+        initColyseus();
+
+        window.addEventListener("resize", onWindowResize, false);
+      }
+
+      // Procedural Voxel Texture & Material Helpers
+      function createVoxelTexture(colorHex, patternType = "noise") {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext("2d");
+
+        ctx.fillStyle = colorHex;
+        ctx.fillRect(0, 0, 16, 16);
+
+        for (let x = 0; x < 16; x++) {
+          for (let y = 0; y < 16; y++) {
+            const noise = (Math.random() - 0.5) * 20;
+            ctx.fillStyle = `rgba(0,0,0,${Math.abs(noise) / 255})`;
+            if (noise > 0) ctx.fillStyle = `rgba(255,255,255,${noise / 255})`;
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        return texture;
+      }
+
+      const blockMaterials = {
+        grass: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#86efac"),
+        }),
+        dirt: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#b45309"),
+        }),
+        wood: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#78350f"),
+        }),
+        leaves: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#4ade80"),
+        }),
+        flowerPink: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#f472b6"),
+        }),
+        flowerPurple: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#c084fc"),
+        }),
+        heartBlock: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#f43f5e"),
+          emissive: 0xe11d48,
+          emissiveIntensity: 0.3,
+        }),
+        stone: new THREE.MeshLambertMaterial({
+          map: createVoxelTexture("#94a3b8"),
+        }),
+        water: new THREE.MeshLambertMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.7,
+        }),
+      };
+
+      const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+      function generateVoxelWorld() {
+        const worldGroup = new THREE.Group();
+        const size = 32;
+
+        for (let x = -size / 2; x < size / 2; x++) {
+          for (let z = -size / 2; z < size / 2; z++) {
+            const grassMesh = new THREE.Mesh(boxGeo, blockMaterials.grass);
+            grassMesh.position.set(x, 0, z);
+            grassMesh.receiveShadow = true;
+            grassMesh.castShadow = true;
+            worldGroup.add(grassMesh);
+
+            const dirtMesh = new THREE.Mesh(boxGeo, blockMaterials.dirt);
+            dirtMesh.position.set(x, -1, z);
+            worldGroup.add(dirtMesh);
+          }
+        }
+
+        // Decorate world with trees, flowers, campfire, and glowing heart monument
+        createTree(worldGroup, -6, 1, -6);
+        createTree(worldGroup, 8, 1, -8);
+        createTree(worldGroup, -10, 1, 6);
+        createTree(worldGroup, 7, 1, 8);
+
+        createHeartMonument(worldGroup, 0, 1, -8);
+        createCampfire(worldGroup, 0, 1, 2);
+
+        for (let i = 0; i < 25; i++) {
+          const rx = (Math.random() - 0.5) * 26;
+          const rz = (Math.random() - 0.5) * 26;
+          if (Math.abs(rx) > 2 || Math.abs(rz) > 2) {
+            createFlower(worldGroup, rx, 1, rz);
+          }
+        }
+
+        scene.add(worldGroup);
+      }
+
+      function createTree(group, x, y, z) {
+        for (let h = 0; h < 4; h++) {
+          const log = new THREE.Mesh(boxGeo, blockMaterials.wood);
+          log.position.set(x, y + h, z);
+          log.castShadow = true;
+          group.add(log);
+        }
+        for (let lx = -1; lx <= 1; lx++) {
+          for (let ly = 3; ly <= 5; ly++) {
+            for (let lz = -1; lz <= 1; lz++) {
+              if (lx === 0 && lz === 0 && ly < 5) continue;
+              const leaf = new THREE.Mesh(boxGeo, blockMaterials.leaves);
+              leaf.position.set(x + lx, y + ly, z + lz);
+              leaf.castShadow = true;
+              group.add(leaf);
+            }
+          }
+        }
+      }
+
+      function createFlower(group, x, y, z) {
+        const mat =
+          Math.random() > 0.5
+            ? blockMaterials.flowerPink
+            : blockMaterials.flowerPurple;
+        const flower = new THREE.Mesh(boxGeo, mat);
+        flower.scale.set(0.3, 0.5, 0.3);
+        flower.position.set(x, y - 0.25, z);
+        group.add(flower);
+      }
+
+      function createHeartMonument(group, x, y, z) {
+        const heartShape = [
+          [0, 1, 0, 0, 1, 0],
+          [1, 1, 1, 1, 1, 1],
+          [1, 1, 1, 1, 1, 1],
+          [0, 1, 1, 1, 1, 0],
+          [0, 0, 1, 1, 0, 0],
+        ];
+        const heartGroup = new THREE.Group();
+        for (let row = 0; row < heartShape.length; row++) {
+          for (let col = 0; col < heartShape[row].length; col++) {
+            if (heartShape[row][col] === 1) {
+              const b = new THREE.Mesh(boxGeo, blockMaterials.heartBlock);
+              b.position.set(col * 0.6 - 1.5, (4 - row) * 0.6 + 1, 0);
+              b.castShadow = true;
+              heartGroup.add(b);
+            }
+          }
+        }
+        heartGroup.position.set(x, y, z);
+        group.add(heartGroup);
+
+        const pointLight = new THREE.PointLight(0xf43f5e, 1.5, 10);
+        pointLight.position.set(x, y + 2, z);
+        group.add(pointLight);
+      }
+
+      function createCampfire(group, x, y, z) {
+        const fireGroup = new THREE.Group();
+        for (let i = 0; i < 4; i++) {
+          const log = new THREE.Mesh(boxGeo, blockMaterials.wood);
+          log.scale.set(0.2, 0.8, 0.2);
+          log.rotation.z = (i % 2 === 0 ? 1 : -1) * 0.4;
+          log.rotation.x = (i > 1 ? 1 : -1) * 0.4;
+          log.position.set(x, y, z);
+          fireGroup.add(log);
+        }
+        const fireLight = new THREE.PointLight(0xf97316, 2, 8);
+        fireLight.position.set(x, y + 0.5, z);
+        fireGroup.add(fireLight);
+        group.add(fireGroup);
+      }
+
+      // Character Mesh Generator
+      function createCharacterMesh(gender = "female") {
+        const group = new THREE.Group();
+        const mainColor = gender === "female" ? "#ec4899" : "#a855f7";
+        const skinColor = "#fde047";
+
+        const bodyMat = new THREE.MeshLambertMaterial({
+          map: createVoxelTexture(mainColor),
+        });
+        const skinMat = new THREE.MeshLambertMaterial({
+          map: createVoxelTexture(skinColor),
+        });
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+
+        // Head
+        const head = new THREE.Mesh(boxGeo, skinMat);
+        head.scale.set(0.8, 0.8, 0.8);
+        head.position.set(0, 1.4, 0);
+        head.castShadow = true;
+        group.add(head);
+
+        // Eyes
+        const eyeL = new THREE.Mesh(boxGeo, eyeMat);
+        eyeL.scale.set(0.1, 0.15, 0.05);
+        eyeL.position.set(-0.2, 1.45, 0.41);
+        group.add(eyeL);
+
+        const eyeR = new THREE.Mesh(boxGeo, eyeMat);
+        eyeR.scale.set(0.1, 0.15, 0.05);
+        eyeR.position.set(0.2, 1.45, 0.41);
+        group.add(eyeR);
+
+        // Torso
+        const torso = new THREE.Mesh(boxGeo, bodyMat);
+        torso.scale.set(0.7, 0.8, 0.4);
+        torso.position.set(0, 0.7, 0);
+        torso.castShadow = true;
+        group.add(torso);
+
+        // Arms
+        const leftArm = new THREE.Mesh(boxGeo, bodyMat);
+        leftArm.scale.set(0.25, 0.7, 0.25);
+        leftArm.position.set(-0.5, 0.65, 0);
+        leftArm.castShadow = true;
+        group.add(leftArm);
+
+        const rightArm = new THREE.Mesh(boxGeo, bodyMat);
+        rightArm.scale.set(0.25, 0.7, 0.25);
+        rightArm.position.set(0.5, 0.65, 0);
+        rightArm.castShadow = true;
+        group.add(rightArm);
+
+        // Legs
+        const leftLeg = new THREE.Mesh(boxGeo, bodyMat);
+        leftLeg.scale.set(0.28, 0.6, 0.28);
+        leftLeg.position.set(-0.2, 0.3, 0);
+        leftLeg.castShadow = true;
+        group.add(leftLeg);
+
+        const rightLeg = new THREE.Mesh(boxGeo, bodyMat);
+        rightLeg.scale.set(0.28, 0.6, 0.28);
+        rightLeg.position.set(0.2, 0.3, 0);
+        rightLeg.castShadow = true;
+        group.add(rightLeg);
+
+        group.userData = {
+          leftArm,
+          rightArm,
+          leftLeg,
+          rightLeg,
+          walkTime: 0,
+        };
+
+        return group;
+      }
+
+      function createAvatars() {
+        playerAvatar = createCharacterMesh(STATE.gender);
+        playerAvatar.position.set(0, 1.0, 5);
+        scene.add(playerAvatar);
+
+        const partnerGender = STATE.gender === "female" ? "male" : "female";
+        partnerAvatar = createCharacterMesh(partnerGender);
+        partnerAvatar.position.set(1.5, 1.0, 4);
+        scene.add(partnerAvatar);
+      }
+
+      // Colyseus Network Integration
+      function initColyseus() {
+        try {
+          colyseusClient = new Colyseus.Client("http://localhost:2567");
+          colyseusClient
+            .joinOrCreate("play_room", { gender: STATE.gender })
+            .then((room) => {
+              colyseusRoom = room;
+              connectionStatus.innerHTML = `Connected: <span class="text-pink-400 font-mono">${room.id}</span>`;
+              console.log("Joined Colyseus room:", room.id);
+              console.log("Current players in room:", room.state.players);
+              console.log("My session ID:", room.sessionId);
+
+              // State listeners
+              room.state.players.onAdd((player, key) => {
+                if (key !== room.sessionId) {
+                  const remoteMesh = createCharacterMesh(
+                    player.gender || "male",
+                  );
+                  remoteMesh.position.set(
+                    player.x || 0,
+                    player.y || 1.0,
+                    player.z || 0,
+                  );
+                  scene.add(remoteMesh);
+                  remoteAvatars[key] = remoteMesh;
+                }
+              });
+
+              room.state.players.onChange((player, key) => {
+                if (key !== room.sessionId && remoteAvatars[key]) {
+                  remoteAvatars[key].position.set(player.x, player.y, player.z);
+                  remoteAvatars[key].rotation.y = player.rotationY || 0;
+                }
+              });
+
+              room.state.players.onRemove((player, key) => {
+                if (remoteAvatars[key]) {
+                  scene.remove(remoteAvatars[key]);
+                  delete remoteAvatars[key];
+                }
+              });
+
+              room.onMessage("speech", (message) => {
+                if (
+                  message.sessionId !== room.sessionId &&
+                  remoteAvatars[message.sessionId]
+                ) {
+                  triggerSpeechBubble(
+                    remoteAvatars[message.sessionId],
+                    message.text,
+                  );
+                }
+              });
+            })
+            .catch((err) => {
+              console.warn(
+                "Colyseus server not found at localhost:2567. Running in offline/companion mode.",
+                err,
+              );
+            });
+        } catch (e) {
+          console.warn("Colyseus connection fallback to companion mode.");
+        }
+      }
+
+      function syncPlayerPosition() {
+        if (colyseusRoom && playerAvatar) {
+          colyseusRoom.send("move", {
+            x: playerAvatar.position.x,
+            y: playerAvatar.position.y,
+            z: playerAvatar.position.z,
+            rotationY: playerAvatar.rotation.y,
+          });
+        }
+      }
+
+      // Overhead Speech Bubble System
+      function triggerSpeechBubble(avatarMesh, text) {
+        if (!avatarMesh) return;
+        const bubble = document.createElement("div");
+        bubble.className = "speech-bubble";
+        bubble.textContent = text;
+        speechContainer.appendChild(bubble);
+
+        avatarMesh.userData.speechBubble = bubble;
+
+        soundEngine.playPop();
+
+        setTimeout(() => {
+          bubble.style.opacity = "0";
+          setTimeout(() => {
+            if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
+            if (avatarMesh.userData.speechBubble === bubble) {
+              avatarMesh.userData.speechBubble = null;
+            }
+          }, 300);
+        }, 4000);
+      }
+
+      function updateSpeechBubblePositions() {
+        const avatars = [
+          playerAvatar,
+          partnerAvatar,
+          ...Object.values(remoteAvatars),
+        ];
+        avatars.forEach((av) => {
+          if (av && av.userData && av.userData.speechBubble) {
+            const tempV = new THREE.Vector3();
+            av.getWorldPosition(tempV);
+            tempV.y += 2.2;
+            tempV.project(camera);
+
+            const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(tempV.y * 0.5) + 0.5) * window.innerHeight;
+
+            const bubble = av.userData.speechBubble;
+            bubble.style.left = `${x}px`;
+            bubble.style.top = `${y}px`;
+          }
+        });
+      }
+
+      // Keyboard & Touch Joystick Controls
+      function setupControls() {
+        window.addEventListener("keydown", (e) => {
+          const k = e.key.toLowerCase();
+          if (keys.hasOwnProperty(k)) keys[k] = true;
+        });
+
+        window.addEventListener("keyup", (e) => {
+          const k = e.key.toLowerCase();
+          if (keys.hasOwnProperty(k)) keys[k] = false;
+        });
+
+        // Touch Joystick Logic
+        let touchId = null;
+        let startX = 0,
+          startY = 0;
+
+        joystickZone.addEventListener("touchstart", (e) => {
+          const touch = e.changedTouches[0];
+          touchId = touch.identifier;
+          startX = touch.clientX;
+          startY = touch.clientY;
+        });
+
+        joystickZone.addEventListener("touchmove", (e) => {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === touchId) {
+              const touch = e.changedTouches[i];
+              const dx = touch.clientX - startX;
+              const dy = touch.clientY - startY;
+              const dist = Math.min(Math.sqrt(dx * dx + dy * dy), 40);
+              const angle = Math.atan2(dy, dx);
+
+              const mx = Math.cos(angle) * dist;
+              const my = Math.sin(angle) * dist;
+
+              joystickKnob.style.transform = `translate(${mx}px, ${my}px)`;
+
+              joystickMove.x = mx / 40;
+              joystickMove.y = my / 40;
+            }
+          }
+        });
+
+        const resetJoystick = () => {
+          touchId = null;
+          joystickKnob.style.transform = `translate(0px, 0px)`;
+          joystickMove.x = 0;
+          joystickMove.y = 0;
+        };
+
+        joystickZone.addEventListener("touchend", resetJoystick);
+        joystickZone.addEventListener("touchcancel", resetJoystick);
+      }
+
+      // Physics & Movement Loop
+      function updatePhysics(delta) {
+        if (!playerAvatar || !world) return;
+
+        // Step Cannon.js Physics Engine
+        world.step(1 / 60, delta, 3);
+
+        // Move Vector Calculation
+        moveVector.set(0, 0, 0);
+
+        if (STATE.isMobile) {
+          moveVector.x = joystickMove.x;
+          moveVector.z = joystickMove.y;
+        } else {
+          if (keys.w) moveVector.z -= 1;
+          if (keys.s) moveVector.z += 1;
+          if (keys.a) moveVector.x -= 1;
+          if (keys.d) moveVector.x += 1;
+          moveVector.normalize();
+        }
+
+        const moveRotated = moveVector
+          .clone()
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        const speed = 5.5;
+
+        // Apply velocities to Cannon.js body & Three.js mesh
+        playerBody.velocity.x = moveRotated.x * speed;
+        playerBody.velocity.z = moveRotated.z * speed;
+
+        playerAvatar.position.copy(playerBody.position);
+
+        // Terrain floor collision check
+        const floorY = 1.0;
+        if (playerAvatar.position.y <= floorY) {
+          playerAvatar.position.y = floorY;
+          playerBody.position.y = floorY;
+          playerBody.velocity.y = 0;
+          isGrounded = true;
+        } else {
+          isGrounded = false;
+        }
+
+        // Avatar Walking Animations
+        if (moveVector.lengthSq() > 0.01) {
+          const moveAngle = Math.atan2(moveRotated.x, moveRotated.z);
+          playerAvatar.rotation.y = moveAngle;
+
+          const u = playerAvatar.userData;
+          u.walkTime += delta * 12;
+          u.leftArm.rotation.x = Math.sin(u.walkTime) * 0.6;
+          u.rightArm.rotation.x = -Math.sin(u.walkTime) * 0.6;
+          u.leftLeg.rotation.x = -Math.sin(u.walkTime) * 0.6;
+          u.rightLeg.rotation.x = Math.sin(u.walkTime) * 0.6;
+
+          syncPlayerPosition();
+        } else {
+          const u = playerAvatar.userData;
+          u.leftArm.rotation.x = 0;
+          u.rightArm.rotation.x = 0;
+          u.leftLeg.rotation.x = 0;
+          u.rightLeg.rotation.x = 0;
+        }
+
+        // Smooth Camera Follow
+        const targetCamPos = playerAvatar.position
+          .clone()
+          .add(
+            new THREE.Vector3(
+              Math.sin(yaw) * Math.cos(pitch) * 6,
+              Math.sin(pitch) * 6 + 2.5,
+              Math.cos(yaw) * Math.cos(pitch) * 6,
+            ),
+          );
+
+        camera.position.lerp(targetCamPos, delta * 8);
+        camera.lookAt(
+          playerAvatar.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
+        );
+
+        simulatePartnerBehavior(delta);
+      }
+
+      function simulatePartnerBehavior(delta) {
+        if (!partnerAvatar) return;
+        const targetAngle = Math.atan2(
+          playerAvatar.position.x - partnerAvatar.position.x,
+          playerAvatar.position.z - partnerAvatar.position.z,
+        );
+        partnerAvatar.rotation.y = THREE.MathUtils.lerp(
+          partnerAvatar.rotation.y,
+          targetAngle,
+          delta * 2,
+        );
+      }
+
+      function syncPeerSpeech(text) {
+        if (colyseusRoom) {
+          colyseusRoom.send("speech", { text: text });
+        }
+
+        if (Math.random() < 0.3) {
+          setTimeout(() => {
+            const companionReplies = [
+              "I love exploring this world with you! ❤️",
+              "You look so cute in voxel form!",
+              "Look at the glowing heart monument over there!",
+              "I'm so happy we get to have this date.",
+            ];
+            const reply =
+              companionReplies[
+                Math.floor(Math.random() * companionReplies.length)
+              ];
+            triggerSpeechBubble(partnerAvatar, reply);
+          }, 2000);
+        }
+      }
+
+      function startTimer() {
+        STATE.timeRemaining = 120; //600;
+        clearInterval(STATE.timerInterval);
+
+        STATE.timerInterval = setInterval(() => {
+          STATE.timeRemaining--;
+          const mins = Math.floor(STATE.timeRemaining / 60);
+          const secs = STATE.timeRemaining % 60;
+          timerDisplay.textContent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+
+          if (STATE.timeRemaining <= 0) {
+            clearInterval(STATE.timerInterval);
+            alert(
+              "Your Virtual Date session has concluded! Thank you for sharing this romantic moment together.",
+            );
+          }
+        }, 1000);
+      }
+
+      // Event Listeners
+      selectFemaleBtn.addEventListener("click", () => {
+        STATE.gender = "female";
+        selectFemaleBtn.className =
+          "avatar-select-btn border-2 border-pink-500 bg-pink-500/20 text-pink-300 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+        selectMaleBtn.className =
+          "avatar-select-btn border-2 border-slate-700 bg-slate-800 text-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+      });
+
+      selectMaleBtn.addEventListener("click", () => {
+        STATE.gender = "male";
+        selectMaleBtn.className =
+          "avatar-select-btn border-2 border-purple-500 bg-purple-500/20 text-purple-300 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+        selectFemaleBtn.className =
+          "avatar-select-btn border-2 border-slate-700 bg-slate-800 text-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+      });
+
+      genRoomBtn.addEventListener("click", () => {
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        roomIdInput.value = code;
+      });
+
+      startDateBtn.addEventListener("click", () => {
+        STATE.roomId = roomIdInput.value.trim() || "play_room";
+        roomCodeDisplay.textContent = STATE.roomId;
+
+        welcomeModal.classList.add("hidden");
+        hud.classList.remove("hidden");
+
+        soundEngine.init();
+        soundEngine.playChime();
+
+        initThreeScene();
+        startTimer();
+        animate();
+      });
+
+      micToggleBtn.addEventListener("click", () => {
+        const active = speechHandler.toggle();
+        if (active) {
+          micIcon.className =
+            "fa-solid fa-microphone text-emerald-400 text-sm animate-pulse";
+          micStatus.textContent = "Mic On";
+        } else {
+          micIcon.className =
+            "fa-solid fa-microphone-slash text-rose-400 text-sm";
+          micStatus.textContent = "Mic Off";
+        }
+      });
+
+      soundToggleBtn.addEventListener("click", () => {
+        STATE.audioMuted = !STATE.audioMuted;
+        soundIcon.className = STATE.audioMuted
+          ? "fa-solid fa-volume-xmark text-slate-500 text-sm"
+          : "fa-solid fa-volume-high text-pink-400 text-sm";
+      });
+
+      function sendChatMessage() {
+        const val = speechTextInput.value.trim();
+        if (val && playerAvatar) {
+          triggerSpeechBubble(playerAvatar, val);
+          syncPeerSpeech(val);
+          speechTextInput.value = "";
+        }
+      }
+
+      sendChatBtn.addEventListener("click", sendChatMessage);
+      speechTextInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendChatMessage();
+      });
+
+      promptBtn.addEventListener("click", () => {
+        promptCard.classList.toggle("hidden");
+      });
+      closePromptBtn.addEventListener("click", () => {
+        promptCard.classList.add("hidden");
+      });
+      nextPromptBtn.addEventListener("click", () => {
+        currentPromptIndex = (currentPromptIndex + 1) % DATE_PROMPTS.length;
+        promptText.textContent = `"${DATE_PROMPTS[currentPromptIndex]}"`;
+        soundEngine.playPop();
+      });
+
+      function onWindowResize() {
+        if (camera && renderer) {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = Math.min(clock.getDelta(), 0.1);
+
+        updatePhysics(delta);
+        updateSpeechBubblePositions();
+
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>

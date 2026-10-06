@@ -1,0 +1,1438 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Voxel Love - Virtual 3D Date World</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Google Font: Inter & Silkscreen for Voxel aesthetic -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      * {
+        touch-action: manipulation;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: "Inter", sans-serif;
+        background-color: #0f172a;
+        color: #f8fafc;
+      }
+      .pixel-font {
+        font-family: "Fredoka One", cursive, cursive;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Joystick overlay styling */
+      #joystick-container {
+        position: absolute;
+        bottom: 24px;
+        left: 24px;
+        width: 120px;
+        height: 120px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(8px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        z-index: 30;
+        display: none;
+        touch-action: none;
+      }
+      #joystick-knob {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #ec4899, #8b5cf6);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+      }
+
+      /* Floating Speech Bubbles Overlay */
+      .speech-bubble {
+        position: absolute;
+        transform: translate(-50%, -100%);
+        background: rgba(255, 255, 255, 0.95);
+        color: #1e1b4b;
+        padding: 8px 14px;
+        border-radius: 16px;
+        border-bottom-left-radius: 2px;
+        font-weight: 600;
+        font-size: 14px;
+        max-width: 220px;
+        box-shadow:
+          0 10px 25px -5px rgba(0, 0, 0, 0.3),
+          0 0 15px rgba(236, 72, 153, 0.3);
+        pointer-events: none;
+        z-index: 25;
+        transition: opacity 0.3s ease;
+        animation: floatUp 0.3s ease-out;
+      }
+      .speech-bubble::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        left: 12px;
+        border-width: 8px 8px 0;
+        border-style: solid;
+        border-color: rgba(255, 255, 255, 0.95) transparent;
+        display: block;
+        width: 0;
+      }
+      .speech-bubble.pink-theme {
+        border: 2px solid #f472b6;
+      }
+      .speech-bubble.purple-theme {
+        border: 2px solid #c084fc;
+      }
+
+      @keyframes floatUp {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -80%);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -100%);
+        }
+      }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(15, 23, 42, 0.6);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #8b5cf6;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body class="relative">
+    <!-- Main HUD Overlay -->
+    <div
+      id="hud"
+      class="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-4 sm:p-6 hidden"
+    >
+      <!-- Top Header Bar -->
+      <div class="flex justify-between items-start pointer-events-auto">
+        <!-- Date Info & Timer -->
+        <div
+          class="bg-slate-900/80 backdrop-blur-md border border-pink-500/30 rounded-2xl p-3 sm:p-4 shadow-xl flex items-center space-x-4"
+        >
+          <div
+            class="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-xl"
+          >
+            <i class="fa-solid fa-heart animate-pulse"></i>
+          </div>
+          <div>
+            <div
+              class="text-xs uppercase font-semibold text-pink-400 tracking-wider"
+            >
+              Virtual Date Session
+            </div>
+            <div
+              id="timer-display"
+              class="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono"
+            >
+              02:00
+            </div>
+          </div>
+        </div>
+
+        <!-- Controls & Menu Buttons -->
+        <div class="flex items-center space-x-2">
+          <button
+            id="mic-toggle-btn"
+            class="bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md border border-slate-700 text-white p-3 rounded-2xl shadow-lg transition active:scale-95 flex items-center space-x-2"
+          >
+            <i
+              id="mic-icon"
+              class="fa-solid fa-microphone-slash text-rose-400 text-lg"
+            ></i>
+            <span id="mic-status" class="text-xs font-semibold hidden sm:inline"
+              >Mic Off</span
+            >
+          </button>
+
+          <button
+            id="sound-toggle-btn"
+            class="bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md border border-slate-700 text-white p-3 rounded-2xl shadow-lg transition active:scale-95"
+          >
+            <i
+              id="sound-icon"
+              class="fa-solid fa-volume-high text-pink-400 text-lg"
+            ></i>
+          </button>
+
+          <button
+            id="code-modal-btn"
+            class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-3 rounded-2xl shadow-lg transition active:scale-95 text-xs font-bold flex items-center space-x-1"
+          >
+            <i class="fa-solid fa-server text-sm"></i>
+            <span class="hidden md:inline">House Rules</span>
+          </button>
+
+          <button
+            id="prompt-btn"
+            class="bg-pink-600 hover:bg-pink-500 text-white p-3 rounded-2xl shadow-lg transition active:scale-95"
+          >
+            <i class="fa-solid fa-lightbulb text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Interactive Romantic Date Prompt Popup -->
+      <div
+        id="date-prompt-card"
+        class="self-center bg-slate-900/90 backdrop-blur-md border border-pink-500/40 rounded-2xl p-4 sm:p-5 shadow-2xl max-w-md w-full text-center pointer-events-auto transform transition-all duration-300 scale-100 hidden"
+      >
+        <div
+          class="inline-block p-2 bg-pink-500/20 text-pink-400 rounded-full mb-2"
+        >
+          <i class="fa-solid fa-sparkles text-xl"></i>
+        </div>
+        <h3 id="prompt-title" class="pixel-font text-lg text-pink-300 mb-1">
+          Date Conversation Starter
+        </h3>
+        <p id="prompt-text" class="text-slate-200 text-sm mb-4 leading-relaxed">
+          "What was the first thing that attracted you to your partner?"
+        </p>
+        <div class="flex justify-center space-x-2">
+          <button
+            id="next-prompt-btn"
+            class="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold text-xs px-4 py-2 rounded-xl hover:opacity-90 transition"
+          >
+            Next Card <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+          <button
+            id="close-prompt-btn"
+            class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-xl transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      <!-- Speech Input Bar (Mobile/Desktop Text Fallback + Voice Status) -->
+      <div class="pointer-events-auto max-w-lg mx-auto w-full mb-2 sm:mb-4">
+        <div
+          class="bg-slate-900/85 backdrop-blur-md border border-purple-500/30 rounded-2xl p-2 shadow-2xl flex items-center space-x-2"
+        >
+          <input
+            id="speech-text-input"
+            type="text"
+            placeholder="Type or click mic to speak..."
+            class="bg-transparent border-none focus:outline-none text-white text-sm px-3 flex-1 placeholder-slate-400"
+          />
+          <button
+            id="send-chat-btn"
+            class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition active:scale-95 flex items-center space-x-1"
+          >
+            <span>Speak</span>
+            <i class="fa-solid fa-paper-plane text-xs"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Touch Joystick & Jump Controls (Mobile Only) -->
+    <div id="joystick-container">
+      <div id="joystick-knob"></div>
+    </div>
+    <button
+      id="jump-btn"
+      class="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-tr from-purple-600 to-pink-500 text-white rounded-full font-bold shadow-2xl z-30 flex items-center justify-center text-xl active:scale-90 transition pointer-events-auto hidden"
+    >
+      <i class="fa-solid fa-angles-up"></i>
+    </button>
+
+    <!-- Welcome / Room Setup Modal -->
+    <div
+      id="welcome-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-lg p-4 overflow-y-auto"
+    >
+      <div
+        class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative overflow-hidden my-auto"
+      >
+        <div
+          class="absolute -top-24 -right-24 w-48 h-48 bg-pink-500/20 rounded-full blur-3xl pointer-events-none"
+        ></div>
+        <div
+          class="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"
+        ></div>
+
+        <div class="text-center mb-6">
+          <div
+            class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500 to-purple-600 text-white text-3xl shadow-lg mb-3"
+          >
+            <i class="fa-solid fa-cubes-stacked"></i>
+          </div>
+          <h1
+            class="pixel-font text-2xl sm:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-300 to-indigo-400"
+          >
+            Voxel Love
+          </h1>
+          <p class="text-xs text-slate-400 mt-1">
+            A 3D Multiplayer Block-World Virtual Date
+          </p>
+        </div>
+
+        <!-- Auth Section -->
+        <div class="space-y-4 mb-6">
+          <div>
+            <label
+              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2"
+              >Partner Identity</label
+            >
+            <input
+              id="user-email-input"
+              type="email"
+              placeholder="Enter Magic Link Email..."
+              value="sweetheart@voxeldate.love"
+              class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-pink-500 transition"
+            />
+          </div>
+
+          <div>
+            <label
+              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2"
+              >Choose Avatar Role</label
+            >
+            <div class="grid grid-cols-2 gap-3">
+              <button
+                id="select-female-btn"
+                class="avatar-select-btn border-2 border-pink-500 bg-pink-500/20 text-pink-300 rounded-2xl p-3 flex flex-col items-center justify-center transition hover:bg-pink-500/30"
+              >
+                <div
+                  class="w-10 h-10 rounded-xl bg-pink-500 flex items-center justify-center text-white text-xl mb-1 shadow-md"
+                >
+                  <i class="fa-solid fa-venus"></i>
+                </div>
+                <span class="text-xs font-bold">Female (Pink)</span>
+              </button>
+
+              <button
+                id="select-male-btn"
+                class="avatar-select-btn border-2 border-slate-700 bg-slate-800 text-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center transition hover:bg-purple-500/20"
+              >
+                <div
+                  class="w-10 h-10 rounded-xl bg-purple-700 flex items-center justify-center text-white text-xl mb-1 shadow-md"
+                >
+                  <i class="fa-solid fa-mars"></i>
+                </div>
+                <span class="text-xs font-bold">Male (Purple)</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label
+              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2"
+              >Room Code</label
+            >
+            <div class="flex space-x-2">
+              <input
+                id="room-id-input"
+                type="text"
+                value="LOVEDATE"
+                class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-pink-300 uppercase font-bold tracking-widest focus:outline-none focus:border-purple-500"
+              />
+              <button
+                id="gen-room-btn"
+                class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 rounded-xl text-xs font-semibold"
+              >
+                Random
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button
+          id="start-date-btn"
+          class="w-full bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white font-bold py-3.5 rounded-2xl shadow-xl hover:opacity-95 transition transform active:scale-98 flex items-center justify-center space-x-2"
+        >
+          <i class="fa-solid fa-heart"></i>
+          <span>Enter Virtual Date World</span>
+        </button>
+
+        <div class="mt-4 text-center">
+          <span class="text-[10px] text-slate-500"
+            >Desktop: WASD + Mouse Look | Mobile: On-Screen Joystick</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Colyseus Backend Code Modal -->
+    <div
+      id="code-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 hidden"
+    >
+      <div
+        class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl"
+      >
+        <div
+          class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3"
+        >
+          <div class="flex items-center space-x-2 text-pink-400">
+            <i class="fa-solid fa-server text-xl"></i>
+            <h2 class="font-bold text-lg text-white">
+              Colyseus.js Backend Room Code
+            </h2>
+          </div>
+          <button
+            id="close-code-modal"
+            class="text-slate-400 hover:text-white text-lg"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <p class="text-xs text-slate-400 mb-3">
+          Deploy this room script to your Node.js Colyseus server instance to
+          host live WebSocket multiplayer sessions.
+        </p>
+
+        <div
+          class="relative flex-1 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800"
+        >
+          <textarea
+            id="colyseus-code-textarea"
+            readonly
+            class="w-full h-full p-4 font-mono text-xs text-emerald-400 bg-transparent resize-none focus:outline-none"
+          >
+          NOTHING TO SEE HERE!
+</textarea
+          >
+        </div>
+
+        <div class="mt-4 flex justify-end">
+          <button
+            id="copy-code-btn"
+            class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-2 transition"
+          >
+            <i class="fa-solid fa-copy"></i>
+            <span>Copy Instructions</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* =========================================================================
+       VOXEL LOVE - THREE.JS 3D VIRTUAL DATE GAME
+       ========================================================================= */
+
+      // App State Configuration
+      const STATE = {
+        gender: "female", // 'female' (pink) or 'male' (purple)
+        partnerGender: "male",
+        roomId: "LOVEDATE",
+        isMobile: false,
+        isMicActive: false,
+        audioMuted: false,
+        timeRemaining: 120, //600, // 10 minutes
+        timerInterval: null,
+        peerConnected: false,
+        typewriterQueue: [],
+      };
+
+      // Date Prompts Data
+      const DATE_PROMPTS = [
+        "What was your absolute first impression about me?",
+        "If we could teleport anywhere in the world together right now, where would we go?",
+        // "What is your favorite memory of us from this past year?",
+        // "Name three tiny things that always make you smile about me.",
+        "What is a silly dream adventure you want us to do together?",
+        "Look up at the glowing heart monument in this world and make a wish together!",
+      ];
+      let currentPromptIndex = 0;
+
+      // DOM Elements
+      const welcomeModal = document.getElementById("welcome-modal");
+      const hud = document.getElementById("hud");
+      const joystickContainer = document.getElementById("joystick-container");
+      const joystickKnob = document.getElementById("joystick-knob");
+      const jumpBtn = document.getElementById("jump-btn");
+      const micToggleBtn = document.getElementById("mic-toggle-btn");
+      const micIcon = document.getElementById("mic-icon");
+      const micStatus = document.getElementById("mic-status");
+      const soundToggleBtn = document.getElementById("sound-toggle-btn");
+      const soundIcon = document.getElementById("sound-icon");
+      const speechTextInput = document.getElementById("speech-text-input");
+      const sendChatBtn = document.getElementById("send-chat-btn");
+      const timerDisplay = document.getElementById("timer-display");
+      const promptCard = document.getElementById("date-prompt-card");
+      const promptText = document.getElementById("prompt-text");
+      const promptBtn = document.getElementById("prompt-btn");
+      const nextPromptBtn = document.getElementById("next-prompt-btn");
+      const closePromptBtn = document.getElementById("close-prompt-btn");
+      const codeModalBtn = document.getElementById("code-modal-btn");
+      const codeModal = document.getElementById("code-modal");
+      const closeCodeModal = document.getElementById("close-code-modal");
+      const copyCodeBtn = document.getElementById("copy-code-btn");
+      const selectFemaleBtn = document.getElementById("select-female-btn");
+      const selectMaleBtn = document.getElementById("select-male-btn");
+      const startDateBtn = document.getElementById("start-date-btn");
+      const genRoomBtn = document.getElementById("gen-room-btn");
+      const roomIdInput = document.getElementById("room-id-input");
+
+      // Web Audio Synthesizer for Romantic Ambiance & Sound Effects
+      class SoundEngine {
+        constructor() {
+          this.ctx = null;
+          this.bgOsc = null;
+        }
+
+        init() {
+          if (!this.ctx) {
+            const AudioContext =
+              window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+            this.startAmbientMusic();
+          }
+        }
+
+        playPop() {
+          if (!this.ctx || STATE.audioMuted) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(
+            800,
+            this.ctx.currentTime + 0.1,
+          );
+          gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.1);
+        }
+
+        playChime() {
+          if (!this.ctx || STATE.audioMuted) return;
+          const now = this.ctx.currentTime;
+          [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, now + idx * 0.08);
+            gain.gain.exponentialRampToValueAtTime(
+              0.001,
+              now + idx * 0.08 + 0.6,
+            );
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + idx * 0.08);
+            osc.stop(now + idx * 0.08 + 0.6);
+          });
+        }
+
+        startAmbientMusic() {
+          if (!this.ctx) return;
+          // Subtle ambient soothing synth pad
+          const chords = [261.63, 329.63, 392.0, 493.88]; // Cmaj7
+          chords.forEach((freq) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.015, this.ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+          });
+        }
+      }
+      const soundEngine = new SoundEngine();
+
+      // Web Speech API Voice Recognition Handler
+      class SpeechHandler {
+        constructor() {
+          this.recognition = null;
+          this.isSupported =
+            "SpeechRecognition" in window ||
+            "webkitSpeechRecognition" in window;
+          if (this.isSupported) {
+            const SpeechRec =
+              window.SpeechRecognition || window.webkitSpeechRecognition;
+            this.recognition = new SpeechRec();
+            this.recognition.continuous = true;
+            this.recognition.interimResults = true;
+            this.recognition.lang = "en-US";
+
+            this.recognition.onresult = (event) => {
+              let transcript = "";
+              for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+              }
+              if (transcript.trim()) {
+                triggerSpeechBubble(playerAvatar, transcript);
+                syncPeerSpeech(transcript);
+              }
+            };
+
+            this.recognition.onerror = (e) => {
+              console.warn("Speech recognition error:", e.error);
+            };
+          }
+        }
+
+        toggle() {
+          if (!this.isSupported) {
+            alert(
+              "Speech Recognition API is not supported in this browser. You can still type in the chat box below!",
+            );
+            return false;
+          }
+          if (STATE.isMicActive) {
+            this.recognition.stop();
+            STATE.isMicActive = false;
+          } else {
+            try {
+              this.recognition.start();
+              STATE.isMicActive = true;
+            } catch (err) {
+              console.error(err);
+            }
+          }
+          return STATE.isMicActive;
+        }
+      }
+      const speechHandler = new SpeechHandler();
+
+      // Three.js Scene Setup
+      let scene, camera, renderer, clock;
+      let playerAvatar, partnerAvatar;
+      let worldBlocks = [];
+      const BLOCK_SIZE = 1;
+      const WORLD_SIZE = 32;
+
+      // Control Variables
+      const keys = { w: false, a: false, s: false, d: false, space: false };
+      let moveVector = new THREE.Vector3();
+      let playerVelocity = new THREE.Vector3();
+      let isGrounded = false;
+      let yaw = 0,
+        pitch = 0;
+
+      // Touch Joystick State
+      let joystickActive = false;
+      let joystickOrigin = { x: 0, y: 0 };
+      let joystickMove = { x: 0, y: 0 };
+
+      function initThreeScene() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.035);
+
+        camera = new THREE.PerspectiveCamera(
+          65,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000,
+        );
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        clock = new THREE.Clock();
+
+        // Lighting Setup
+        const ambientLight = new THREE.AmbientLight(0xd8b4fe, 0.6); // Romantic warm purple tone
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffedd5, 1.2); // Warm sunlight / moonlight
+        dirLight.position.set(20, 40, 20);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 100;
+        dirLight.shadow.camera.left = -25;
+        dirLight.shadow.camera.right = 25;
+        dirLight.shadow.camera.top = 25;
+        dirLight.shadow.camera.bottom = -25;
+        scene.add(dirLight);
+
+        // Generate World
+        generateVoxelWorld();
+
+        // Create Avatars
+        createAvatars();
+
+        // Desktop & Touch Controls Setup
+        setupControls();
+
+        // Window Resize Listener
+        window.addEventListener("resize", onWindowResize);
+      }
+
+      // Voxel Texture Generator (Canvas-based procedurally generated textures)
+      function createVoxelTexture(colorHex, noiseAmount = 0.1) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = colorHex;
+        ctx.fillRect(0, 0, 16, 16);
+
+        // Add pixel noise for block texture
+        const baseColor = new THREE.Color(colorHex);
+        for (let x = 0; x < 16; x++) {
+          for (let y = 0; y < 16; y++) {
+            if (Math.random() < 0.4) {
+              const factor = 1 + (Math.random() - 0.5) * noiseAmount;
+              ctx.fillStyle = `#${baseColor.clone().multiplyScalar(factor).getHexString()}`;
+              ctx.fillRect(x, y, 1, 1);
+            }
+          }
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        return texture;
+      }
+
+      // Block Materials
+      const materials = {
+        grass: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#4ade80"),
+          roughness: 0.8,
+        }),
+        dirt: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#78350f"),
+          roughness: 0.9,
+        }),
+        wood: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#451a03"),
+          roughness: 0.7,
+        }),
+        leaves: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#15803d"),
+          roughness: 0.6,
+        }),
+        flowerPink: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#f472b6"),
+          emissive: 0x831843,
+          roughness: 0.5,
+        }),
+        flowerPurple: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#c084fc"),
+          emissive: 0x581c87,
+          roughness: 0.5,
+        }),
+        heartBlock: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#f43f5e"),
+          emissive: 0xe11d48,
+          emissiveIntensity: 0.6,
+        }),
+        stone: new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#64748b"),
+          roughness: 0.8,
+        }),
+        water: new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.7,
+          roughness: 0.1,
+        }),
+      };
+
+      function generateVoxelWorld() {
+        const boxGeo = new THREE.BoxGeometry(
+          BLOCK_SIZE,
+          BLOCK_SIZE,
+          BLOCK_SIZE,
+        );
+        const halfSize = Math.floor(WORLD_SIZE / 2);
+
+        // Instanced Mesh Setup for performance
+        for (let x = -halfSize; x < halfSize; x++) {
+          for (let z = -halfSize; z < halfSize; z++) {
+            // Terrain Height function
+            const distFromCenter = Math.sqrt(x * x + z * z);
+            let yHeight = Math.floor(
+              Math.sin(x * 0.2) * Math.cos(z * 0.2) * 1.5,
+            );
+
+            if (distFromCenter > halfSize - 3) {
+              yHeight += 2; // Outer boundaries
+            }
+
+            // Top Grass Block
+            const grassMesh = new THREE.Mesh(boxGeo, materials.grass);
+            grassMesh.position.set(x, yHeight, z);
+            grassMesh.receiveShadow = true;
+            grassMesh.castShadow = true;
+            scene.add(grassMesh);
+            worldBlocks.push(grassMesh);
+
+            // Dirt underneath
+            for (let dy = yHeight - 1; dy >= yHeight - 2; dy--) {
+              const dirtMesh = new THREE.Mesh(boxGeo, materials.dirt);
+              dirtMesh.position.set(x, dy, z);
+              scene.add(dirtMesh);
+              worldBlocks.push(dirtMesh);
+            }
+
+            // Place Trees & Flowers
+            if (Math.abs(x) > 3 && Math.abs(z) > 3 && Math.random() < 0.04) {
+              createTree(x, yHeight + 1, z);
+            } else if (Math.random() < 0.08) {
+              createFlower(x, yHeight + 1, z);
+            }
+          }
+        }
+
+        // Centerpiece: Glowing Romantic Heart Monument
+        createHeartMonument(0, 1, -6);
+
+        // Romantic Campfire
+        createCampfire(0, 1, 0);
+      }
+
+      function createTree(x, y, z) {
+        const boxGeo = new THREE.BoxGeometry(
+          BLOCK_SIZE,
+          BLOCK_SIZE,
+          BLOCK_SIZE,
+        );
+        const trunkHeight = 3 + Math.floor(Math.random() * 2);
+
+        // Trunk
+        for (let i = 0; i < trunkHeight; i++) {
+          const trunk = new THREE.Mesh(boxGeo, materials.wood);
+          trunk.position.set(x, y + i, z);
+          trunk.castShadow = true;
+          scene.add(trunk);
+          worldBlocks.push(trunk);
+        }
+
+        // Leaves
+        const leafTop = y + trunkHeight;
+        for (let lx = -1; lx <= 1; lx++) {
+          for (let lz = -1; lz <= 1; lz++) {
+            for (let ly = 0; ly <= 2; ly++) {
+              if (ly === 2 && Math.abs(lx) === 1 && Math.abs(lz) === 1)
+                continue;
+              const leaf = new THREE.Mesh(boxGeo, materials.leaves);
+              leaf.position.set(x + lx, leafTop + ly, z + lz);
+              leaf.castShadow = true;
+              scene.add(leaf);
+            }
+          }
+        }
+      }
+
+      function createFlower(x, y, z) {
+        const mat =
+          Math.random() > 0.5 ? materials.flowerPink : materials.flowerPurple;
+        const flowerGeo = new THREE.BoxGeometry(0.3, 0.5, 0.3);
+        const flower = new THREE.Mesh(flowerGeo, mat);
+        flower.position.set(x, y + 0.25, z);
+        scene.add(flower);
+      }
+
+      function createHeartMonument(x, y, z) {
+        const heartPattern = [
+          [0, 1, 1, 0, 1, 1, 0],
+          [1, 1, 1, 1, 1, 1, 1],
+          [1, 1, 1, 1, 1, 1, 1],
+          [0, 1, 1, 1, 1, 1, 0],
+          [0, 0, 1, 1, 1, 0, 0],
+          [0, 0, 0, 1, 0, 0, 0],
+        ];
+
+        const boxGeo = new THREE.BoxGeometry(
+          BLOCK_SIZE * 0.8,
+          BLOCK_SIZE * 0.8,
+          BLOCK_SIZE * 0.8,
+        );
+        for (let r = 0; r < heartPattern.length; r++) {
+          for (let c = 0; c < heartPattern[r].length; c++) {
+            if (heartPattern[r][c] === 1) {
+              const block = new THREE.Mesh(boxGeo, materials.heartBlock);
+              block.position.set(
+                x + (c - 3) * 0.8,
+                y + (heartPattern.length - r) * 0.8 + 2,
+                z,
+              );
+              block.castShadow = true;
+              scene.add(block);
+            }
+          }
+        }
+
+        // Glow light around heart
+        const heartLight = new THREE.PointLight(0xf43f5e, 2, 12);
+        heartLight.position.set(x, y + 4, z);
+        scene.add(heartLight);
+      }
+
+      function createCampfire(x, y, z) {
+        const logGeo = new THREE.BoxGeometry(0.8, 0.2, 0.2);
+        const log1 = new THREE.Mesh(logGeo, materials.wood);
+        log1.position.set(x, y + 0.1, z);
+        log1.rotation.y = Math.PI / 4;
+        const log2 = log1.clone();
+        log2.rotation.y = -Math.PI / 4;
+        scene.add(log1);
+        scene.add(log2);
+
+        // Fire light
+        const fireLight = new THREE.PointLight(0xf97316, 2.5, 8);
+        fireLight.position.set(x, y + 0.5, z);
+        scene.add(fireLight);
+      }
+
+      // Character Avatar Construction
+      function createCharacterMesh(gender) {
+        const group = new THREE.Group();
+
+        const mainColor = gender === "female" ? 0xec4899 : 0x8b5cf6; // Pink or Purple
+        const bodyMat = new THREE.MeshStandardMaterial({
+          map: createVoxelTexture(gender === "female" ? "#ec4899" : "#8b5cf6"),
+          roughness: 0.5,
+        });
+        const skinMat = new THREE.MeshStandardMaterial({
+          map: createVoxelTexture("#fde047"),
+          roughness: 0.6,
+        });
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+
+        // Head
+        const head = new THREE.Mesh(
+          new THREE.BoxGeometry(0.6, 0.6, 0.6),
+          skinMat,
+        );
+        head.position.y = 1.3;
+        head.castShadow = true;
+        group.add(head);
+
+        // Eyes
+        const eyeLeft = new THREE.Mesh(
+          new THREE.BoxGeometry(0.1, 0.1, 0.05),
+          eyeMat,
+        );
+        eyeLeft.position.set(-0.15, 1.35, 0.31);
+        const eyeRight = eyeLeft.clone();
+        eyeRight.position.x = 0.15;
+        group.add(eyeLeft);
+        group.add(eyeRight);
+
+        // Torso
+        const torso = new THREE.Mesh(
+          new THREE.BoxGeometry(0.6, 0.7, 0.35),
+          bodyMat,
+        );
+        torso.position.y = 0.65;
+        torso.castShadow = true;
+        group.add(torso);
+
+        // Arms
+        const armGeo = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+        const leftArm = new THREE.Mesh(armGeo, bodyMat);
+        leftArm.position.set(-0.42, 0.65, 0);
+        leftArm.castShadow = true;
+
+        const rightArm = new THREE.Mesh(armGeo, bodyMat);
+        rightArm.position.set(0.42, 0.65, 0);
+        rightArm.castShadow = true;
+
+        group.add(leftArm);
+        group.add(rightArm);
+
+        // Legs
+        const legGeo = new THREE.BoxGeometry(0.25, 0.5, 0.25);
+        const leftLeg = new THREE.Mesh(legGeo, bodyMat);
+        leftLeg.position.set(-0.15, 0.25, 0);
+        leftLeg.castShadow = true;
+
+        const rightLeg = new THREE.Mesh(legGeo, bodyMat);
+        rightLeg.position.set(0.15, 0.25, 0);
+        rightLeg.castShadow = true;
+
+        group.add(leftLeg);
+        group.add(rightLeg);
+
+        // Attach limb references for walking animation
+        group.userData = {
+          leftArm,
+          rightArm,
+          leftLeg,
+          rightLeg,
+          head,
+          walkTime: 0,
+          gender,
+        };
+
+        return group;
+      }
+
+      function createAvatars() {
+        // User Player Avatar
+        playerAvatar = createCharacterMesh(STATE.gender);
+        playerAvatar.position.set(-1.5, 1, 1.5);
+        scene.add(playerAvatar);
+
+        // Partner Avatar
+        STATE.partnerGender = STATE.gender === "female" ? "male" : "female";
+        partnerAvatar = createCharacterMesh(STATE.partnerGender);
+        partnerAvatar.position.set(1.5, 0.5, 1.5);
+        scene.add(partnerAvatar);
+      }
+
+      // Overhead Speech Bubble Manager
+      const speechBubbles = new Map(); // Avatar -> DOM Element
+
+      function triggerSpeechBubble(avatarMesh, text) {
+        soundEngine.playPop();
+
+        let bubble = speechBubbles.get(avatarMesh);
+        if (!bubble) {
+          bubble = document.createElement("div");
+          bubble.className = `speech-bubble ${avatarMesh.userData.gender === "female" ? "pink-theme" : "purple-theme"}`;
+          document.body.appendChild(bubble);
+          speechBubbles.set(avatarMesh, bubble);
+        }
+
+        // Typewriter Effect
+        bubble.style.opacity = "1";
+        bubble.textContent = "";
+        let charIdx = 0;
+        if (bubble.userData && bubble.userData.timer)
+          clearInterval(bubble.userData.timer);
+
+        const timer = setInterval(() => {
+          if (charIdx < text.length) {
+            bubble.textContent += text.charAt(charIdx);
+            charIdx++;
+          } else {
+            clearInterval(timer);
+            // Auto fade after 5s
+            setTimeout(() => {
+              bubble.style.opacity = "0";
+            }, 4000);
+          }
+        }, 35);
+
+        bubble.userData = { timer };
+      }
+
+      function updateSpeechBubblePositions() {
+        speechBubbles.forEach((bubble, avatarMesh) => {
+          if (bubble.style.opacity === "0") return;
+
+          // Project 3D position to 2D Screen
+          const headPos = avatarMesh.position.clone();
+          headPos.y += 2.0; // Above head
+
+          headPos.project(camera);
+
+          const x = (headPos.x * 0.5 + 0.5) * window.innerWidth;
+          const y = (-(headPos.y * 0.5) + 0.5) * window.innerHeight;
+
+          bubble.style.left = `${x}px`;
+          bubble.style.top = `${y}px`;
+        });
+      }
+
+      function setupControls() {
+        // Desktop Keyboard Events
+        window.addEventListener("keydown", (e) => {
+          switch (e.key.toLowerCase()) {
+            case "w":
+              keys.w = true;
+              break;
+            case "a":
+              keys.a = true;
+              break;
+            case "s":
+              keys.s = true;
+              break;
+            case "d":
+              keys.d = true;
+              break;
+            case " ":
+              if (isGrounded) playerVelocity.y = 8;
+              break;
+          }
+        });
+
+        window.addEventListener("keyup", (e) => {
+          switch (e.key.toLowerCase()) {
+            case "w":
+              keys.w = false;
+              break;
+            case "a":
+              keys.a = false;
+              break;
+            case "s":
+              keys.s = false;
+              break;
+            case "d":
+              keys.d = false;
+              break;
+          }
+        });
+
+        // Desktop Pointer Lock Mouse Look
+        renderer.domElement.addEventListener("click", () => {
+          if (!STATE.isMobile && welcomeModal.classList.contains("hidden")) {
+            renderer.domElement.requestPointerLock();
+          }
+        });
+
+        document.addEventListener("mousemove", (e) => {
+          if (document.pointerLockElement === renderer.domElement) {
+            yaw -= e.movementX * 0.003;
+            pitch -= e.movementY * 0.003;
+            pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, pitch));
+          }
+        });
+
+        // Mobile Touch Joystick Logic
+        if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
+          STATE.isMobile = true;
+          joystickContainer.style.display = "block";
+          jumpBtn.classList.remove("hidden");
+
+          joystickContainer.addEventListener("touchstart", (e) => {
+            joystickActive = true;
+            const touch = e.touches[0];
+            const rect = joystickContainer.getBoundingClientRect();
+            joystickOrigin = {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+            };
+          });
+
+          window.addEventListener("touchmove", (e) => {
+            if (!joystickActive) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - joystickOrigin.x;
+            const dy = touch.clientY - joystickOrigin.y;
+            const dist = Math.min(40, Math.hypot(dx, dy));
+            const angle = Math.atan2(dy, dx);
+
+            joystickMove = {
+              x: (Math.cos(angle) * dist) / 40,
+              y: (Math.sin(angle) * dist) / 40,
+            };
+
+            joystickKnob.style.transform = `translate(calc(-50% + ${Math.cos(angle) * dist}px), calc(-50% + ${Math.sin(angle) * dist}px))`;
+          });
+
+          const resetJoystick = () => {
+            joystickActive = false;
+            joystickMove = { x: 0, y: 0 };
+            joystickKnob.style.transform = "translate(-50%, -50%)";
+          };
+
+          window.addEventListener("touchend", resetJoystick);
+          window.addEventListener("touchcancel", resetJoystick);
+
+          jumpBtn.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            if (isGrounded) playerVelocity.y = 8;
+          });
+        }
+      }
+
+      function updatePhysics(delta) {
+        if (!playerAvatar) return;
+
+        // Apply Gravity
+        playerVelocity.y -= 22 * delta;
+
+        // Calculate Movement Input Vector
+        moveVector.set(0, 0, 0);
+
+        if (STATE.isMobile) {
+          moveVector.x = joystickMove.x;
+          moveVector.z = joystickMove.y;
+        } else {
+          if (keys.w) moveVector.z -= 1;
+          if (keys.s) moveVector.z += 1;
+          if (keys.a) moveVector.x -= 1;
+          if (keys.d) moveVector.x += 1;
+          moveVector.normalize();
+        }
+
+        // Rotate move vector based on Camera Yaw
+        const moveRotated = moveVector
+          .clone()
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        const speed = 5.5;
+
+        playerAvatar.position.x += moveRotated.x * speed * delta;
+        playerAvatar.position.z += moveRotated.z * speed * delta;
+        playerAvatar.position.y += playerVelocity.y * delta;
+
+        // Simple Terrain Floor Collision
+        const floorY = 1.0;
+        if (playerAvatar.position.y <= floorY) {
+          playerAvatar.position.y = floorY;
+          playerVelocity.y = 0;
+          isGrounded = true;
+        } else {
+          isGrounded = false;
+        }
+
+        // Rotate Avatar towards movement direction
+        if (moveVector.lengthSq() > 0.01) {
+          const moveAngle = Math.atan2(moveRotated.x, moveRotated.z);
+          playerAvatar.rotation.y = moveAngle;
+
+          // Walking Animation
+          const u = playerAvatar.userData;
+          u.walkTime += delta * 12;
+          u.leftArm.rotation.x = Math.sin(u.walkTime) * 0.6;
+          u.rightArm.rotation.x = -Math.sin(u.walkTime) * 0.6;
+          u.leftLeg.rotation.x = -Math.sin(u.walkTime) * 0.6;
+          u.rightLeg.rotation.x = Math.sin(u.walkTime) * 0.6;
+        } else {
+          // Idle Animation
+          const u = playerAvatar.userData;
+          u.leftArm.rotation.x = 0;
+          u.rightArm.rotation.x = 0;
+          u.leftLeg.rotation.x = 0;
+          u.rightLeg.rotation.x = 0;
+        }
+
+        // Smooth Third-Person Camera Follow
+        const targetCamPos = playerAvatar.position
+          .clone()
+          .add(
+            new THREE.Vector3(
+              Math.sin(yaw) * Math.cos(pitch) * 6,
+              Math.sin(pitch) * 6 + 2.5,
+              Math.cos(yaw) * Math.cos(pitch) * 6,
+            ),
+          );
+
+        camera.position.lerp(targetCamPos, delta * 8);
+        camera.lookAt(
+          playerAvatar.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
+        );
+
+        // Simulate Partner Idle Companion Movement
+        simulatePartnerBehavior(delta);
+      }
+
+      function simulatePartnerBehavior(delta) {
+        if (!partnerAvatar) return;
+        // Partner gently faces user and bobbing animation
+        const targetAngle = Math.atan2(
+          playerAvatar.position.x - partnerAvatar.position.x,
+          playerAvatar.position.z - partnerAvatar.position.z,
+        );
+        partnerAvatar.rotation.y = THREE.MathUtils.lerp(
+          partnerAvatar.rotation.y,
+          targetAngle,
+          delta * 2,
+        );
+      }
+
+      function syncPeerSpeech(text) {
+        // In standalone peer mode, simulate partner echoing occasional romantic responses
+        if (Math.random() < 0.3) {
+          setTimeout(() => {
+            const companionReplies = [
+              "You look so cute in voxel form!",
+              "I love exploring this world with you! ❤️",
+              "Look at the glowing heart monument over there!",
+              "I'm so happy we get to have this date.",
+            ];
+            const reply =
+              companionReplies[
+                Math.floor(Math.random() * companionReplies.length)
+              ];
+            triggerSpeechBubble(partnerAvatar, reply);
+          }, 2000);
+        }
+      }
+
+      function startTimer() {
+        STATE.timeRemaining = 120; //600;
+        clearInterval(STATE.timerInterval);
+
+        STATE.timerInterval = setInterval(() => {
+          STATE.timeRemaining--;
+          const mins = Math.floor(STATE.timeRemaining / 60);
+          const secs = STATE.timeRemaining % 60;
+          timerDisplay.textContent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+
+          if (STATE.timeRemaining <= 0) {
+            clearInterval(STATE.timerInterval);
+            alert(
+              "Your Virtual Date session has concluded! Thank you for sharing this romantic moment together.",
+            );
+          }
+        }, 1000);
+      }
+
+      // UI Event Listeners
+      selectFemaleBtn.addEventListener("click", () => {
+        STATE.gender = "female";
+        selectFemaleBtn.className =
+          "avatar-select-btn border-2 border-pink-500 bg-pink-500/20 text-pink-300 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+        selectMaleBtn.className =
+          "avatar-select-btn border-2 border-slate-700 bg-slate-800 text-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+      });
+
+      selectMaleBtn.addEventListener("click", () => {
+        STATE.gender = "male";
+        selectMaleBtn.className =
+          "avatar-select-btn border-2 border-purple-500 bg-purple-500/20 text-purple-300 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+        selectFemaleBtn.className =
+          "avatar-select-btn border-2 border-slate-700 bg-slate-800 text-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center transition";
+      });
+
+      genRoomBtn.addEventListener("click", () => {
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        roomIdInput.value = code;
+      });
+
+      startDateBtn.addEventListener("click", () => {
+        welcomeModal.classList.add("hidden");
+        hud.classList.remove("hidden");
+
+        soundEngine.init();
+        soundEngine.playChime();
+
+        initThreeScene();
+        startTimer();
+        animate();
+      });
+
+      // Mic Toggle
+      micToggleBtn.addEventListener("click", () => {
+        const active = speechHandler.toggle();
+        if (active) {
+          micIcon.className =
+            "fa-solid fa-microphone text-emerald-400 text-lg animate-pulse";
+          micStatus.textContent = "Mic On";
+          micToggleBtn.classList.add("border-emerald-500/50");
+        } else {
+          micIcon.className =
+            "fa-solid fa-microphone-slash text-rose-400 text-lg";
+          micStatus.textContent = "Mic Off";
+          micToggleBtn.classList.remove("border-emerald-500/50");
+        }
+      });
+
+      // Sound Toggle
+      soundToggleBtn.addEventListener("click", () => {
+        STATE.audioMuted = !STATE.audioMuted;
+        soundIcon.className = STATE.audioMuted
+          ? "fa-solid fa-volume-xmark text-slate-500 text-lg"
+          : "fa-solid fa-volume-high text-pink-400 text-lg";
+      });
+
+      // Chat Bar Input
+      function sendChatMessage() {
+        const val = speechTextInput.value.trim();
+        if (val && playerAvatar) {
+          triggerSpeechBubble(playerAvatar, val);
+          syncPeerSpeech(val);
+          speechTextInput.value = "";
+        }
+      }
+
+      sendChatBtn.addEventListener("click", sendChatMessage);
+      speechTextInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendChatMessage();
+      });
+
+      // Date Prompts Deck
+      promptBtn.addEventListener("click", () => {
+        promptCard.classList.toggle("hidden");
+      });
+      closePromptBtn.addEventListener("click", () => {
+        promptCard.classList.add("hidden");
+      });
+      nextPromptBtn.addEventListener("click", () => {
+        currentPromptIndex = (currentPromptIndex + 1) % DATE_PROMPTS.length;
+        promptText.textContent = `"${DATE_PROMPTS[currentPromptIndex]}"`;
+        soundEngine.playPop();
+      });
+
+      // Server Code Modal
+      codeModalBtn.addEventListener("click", () =>
+        codeModal.classList.remove("hidden"),
+      );
+      closeCodeModal.addEventListener("click", () =>
+        codeModal.classList.add("hidden"),
+      );
+      copyCodeBtn.addEventListener("click", () => {
+        const codeArea = document.getElementById("colyseus-code-textarea");
+        codeArea.select();
+        document.execCommand("copy");
+        copyCodeBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Copied!</span>`;
+        setTimeout(() => {
+          copyCodeBtn.innerHTML = `<i class="fa-solid fa-copy"></i> <span>Copy Instructions</span>`;
+        }, 2000);
+      });
+
+      function onWindowResize() {
+        if (camera && renderer) {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = Math.min(clock.getDelta(), 0.1);
+
+        updatePhysics(delta);
+        updateSpeechBubblePositions();
+
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>
