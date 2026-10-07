@@ -1365,6 +1365,7 @@
       // Sound Toggle
       soundToggleBtn.addEventListener("click", () => {
         STATE.audioMuted = !STATE.audioMuted;
+
         soundIcon.className = STATE.audioMuted
           ? "fa-solid fa-volume-xmark text-slate-500 text-lg"
           : "fa-solid fa-volume-high text-pink-400 text-lg";

@@ -137,6 +137,41 @@
         background: #8b5cf6;
         border-radius: 4px;
       }
+
+      /* Screen Overlay */
+      .screen-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 12, 32, 0.92);
+        backdrop-filter: blur(20px);
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 30px;
+        pointer-events: auto;
+      }
+
+      .screen-overlay h1 {
+        font-size: 2.8rem;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, #ff4757, #ff6b81);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .screen-overlay p {
+        font-size: 1.1rem;
+        color: #a4b0be;
+        max-width: 440px;
+        margin-bottom: 30px;
+        line-height: 1.5;
+      }
     </style>
   </head>
   <body class="relative">
@@ -158,6 +193,7 @@
           </div>
           <div>
             <div
+              id="dateroom-id"
               class="text-xs uppercase font-semibold text-pink-400 tracking-wider"
             >
               Virtual Date Session
@@ -420,9 +456,14 @@
           </button>
         </div>
         <p class="text-xs text-slate-400 mb-3">
-          Deploy this room script to your Node.js Colyseus server instance to
-          host live WebSocket multiplayer sessions.
+          These are the game instructions, how to play, and rules.
         </p>
+        <button
+          id="end-date-btn"
+          class="w-24 bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 m-2 rounded-xl text-xs"
+        >
+          END DATE
+        </button>
 
         <div
           class="relative flex-1 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800"
@@ -449,6 +490,27 @@
       </div>
     </div>
 
+    <!-- "Date Over" Summary Screen Overlay -->
+    <div class="screen-overlay hidden" id="date-over-screen">
+      <h1>Date Over!</h1>
+      <p>Time's up! Here is a summary of your speed dating session:</p>
+
+      <div class="stats-card">
+        <div class="stat-row">
+          <span class="stat-label">Duration</span>
+          <span class="stat-value" id="stat-duration">03:00</span>
+        </div>
+        <p>Rate your date experience</p>
+      </div>
+
+      <button
+        id="date-over-exit-btn"
+        class="w-24 bg-orange-600 hover:bg-orange-500 text-white font-bold px-4 py-2 rounded-xl text-xs"
+      >
+        Exit
+      </button>
+    </div>
+
     <script>
       /* =========================================================================
        VOXEL LOVE - THREE.JS 3D VIRTUAL DATE GAME
@@ -468,6 +530,28 @@
         typewriterQueue: [],
       };
 
+      // Scene Variables
+      let scene, camera, renderer, clock;
+      let playerAvatar, partnerAvatar;
+      let worldBlocks = [];
+      const BLOCK_SIZE = 1;
+      const WORLD_SIZE = 32;
+
+      // Control Variables
+      const keys = { w: false, a: false, s: false, d: false, space: false };
+      let moveVector = new THREE.Vector3();
+      let playerVelocity = new THREE.Vector3();
+      let isGrounded = false;
+      let yaw = 0,
+        pitch = 0;
+
+      // Touch Joystick State
+      let joystickActive = false;
+      let joystickOrigin = { x: 0, y: 0 };
+      let joystickMove = { x: 0, y: 0 };
+
+      //----------------
+
       // Date Prompts Data
       const DATE_PROMPTS = [
         "What was your absolute first impression about me?",
@@ -481,6 +565,7 @@
 
       // DOM Elements
       const welcomeModal = document.getElementById("welcome-modal");
+      const dateRoomID = document.getElementById("dateroom-id");
       const hud = document.getElementById("hud");
       const joystickContainer = document.getElementById("joystick-container");
       const joystickKnob = document.getElementById("joystick-knob");
@@ -500,15 +585,22 @@
       const closePromptBtn = document.getElementById("close-prompt-btn");
       const codeModalBtn = document.getElementById("code-modal-btn");
       const codeModal = document.getElementById("code-modal");
+
       const closeCodeModal = document.getElementById("close-code-modal");
       const copyCodeBtn = document.getElementById("copy-code-btn");
+
       const selectFemaleBtn = document.getElementById("select-female-btn");
       const selectMaleBtn = document.getElementById("select-male-btn");
       const startDateBtn = document.getElementById("start-date-btn");
+      const endDateBtn = document.getElementById("end-date-btn");
+      const dateOverExitBtn = document.getElementById("date-over-exit-btn");
       const genRoomBtn = document.getElementById("gen-room-btn");
       const roomIdInput = document.getElementById("room-id-input");
 
       // Web Audio Synthesizer for Romantic Ambiance & Sound Effects
+      const listener = new THREE.AudioListener();
+      const ambientSound = new THREE.Audio(listener);
+      const audioLoader = new THREE.AudioLoader();
       class SoundEngine {
         constructor() {
           this.ctx = null;
@@ -565,7 +657,7 @@
         startAmbientMusic() {
           if (!this.ctx) return;
           // Subtle ambient soothing synth pad
-          const chords = [261.63, 329.63, 392.0, 493.88]; // Cmaj7
+          /*   const chords = [261.63, 329.63, 392.0, 493.88]; // Cmaj7
           chords.forEach((freq) => {
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
@@ -575,7 +667,32 @@
             osc.connect(gain);
             gain.connect(this.ctx.destination);
             osc.start();
+          }); */
+          camera.add(listener);
+          audioLoader.load("assets/sounds/ambient1.mp3", function (buffer) {
+            ambientSound.setBuffer(buffer);
+            ambientSound.setLoop(true);
+            ambientSound.setVolume(0.2);
+            ambientSound.play();
           });
+        }
+
+        stopAmbientMusic() {
+          if (ambientSound.isPlaying) {
+            ambientSound.stop();
+          }
+        }
+
+        pauseAmbientMusic() {
+          if (ambientSound.isPlaying) {
+            ambientSound.pause();
+          }
+        }
+
+        playAmbientMusic() {
+          if (!ambientSound.isPlaying) {
+            ambientSound.play();
+          }
         }
       }
       const soundEngine = new SoundEngine();
@@ -636,24 +753,6 @@
       const speechHandler = new SpeechHandler();
 
       // Three.js Scene Setup
-      let scene, camera, renderer, clock;
-      let playerAvatar, partnerAvatar;
-      let worldBlocks = [];
-      const BLOCK_SIZE = 1;
-      const WORLD_SIZE = 32;
-
-      // Control Variables
-      const keys = { w: false, a: false, s: false, d: false, space: false };
-      let moveVector = new THREE.Vector3();
-      let playerVelocity = new THREE.Vector3();
-      let isGrounded = false;
-      let yaw = 0,
-        pitch = 0;
-
-      // Touch Joystick State
-      let joystickActive = false;
-      let joystickOrigin = { x: 0, y: 0 };
-      let joystickMove = { x: 0, y: 0 };
 
       function initThreeScene() {
         scene = new THREE.Scene();
@@ -675,6 +774,9 @@
         document.body.appendChild(renderer.domElement);
 
         clock = new THREE.Clock();
+        // added lately
+        soundEngine.init();
+        soundEngine.playChime();
 
         // Lighting Setup
         const ambientLight = new THREE.AmbientLight(0xd8b4fe, 0.6); // Romantic warm purple tone
@@ -1305,9 +1407,15 @@
 
           if (STATE.timeRemaining <= 0) {
             clearInterval(STATE.timerInterval);
-            alert(
-              "Your Virtual Date session has concluded! Thank you for sharing this romantic moment together.",
-            );
+            soundEngine.stopAmbientMusic();
+            // Display "Date Over" Overlay
+            document
+              .getElementById("date-over-screen")
+              .classList.remove("hidden");
+            welcomeModal.classList.remove("hidden");
+            // alert(
+            //   "Your Virtual Date session has concluded! Thank you for sharing this romantic moment together.",
+            // );
           }
         }, 1000);
       }
@@ -1338,12 +1446,29 @@
         welcomeModal.classList.add("hidden");
         hud.classList.remove("hidden");
 
-        soundEngine.init();
-        soundEngine.playChime();
+        // soundEngine.init();
+        // soundEngine.playChime();
 
         initThreeScene();
         startTimer();
         animate();
+      });
+
+      endDateBtn.addEventListener("click", () => {
+        if (confirm("Are you sure you want to end the date early?")) {
+          clearInterval(STATE.timerInterval);
+          soundEngine.stopAmbientMusic();
+          // // Display "Date Over" Overlay
+          // document
+          //   .getElementById("date-over-screen")
+          //   .classList.remove("hidden");
+          welcomeModal.classList.remove("hidden");
+        }
+      });
+
+      dateOverExitBtn.addEventListener("click", () => {
+        document.getElementById("date-over-screen").classList.add("hidden");
+        welcomeModal.classList.remove("hidden");
       });
 
       // Mic Toggle
@@ -1365,6 +1490,10 @@
       // Sound Toggle
       soundToggleBtn.addEventListener("click", () => {
         STATE.audioMuted = !STATE.audioMuted;
+        console.log("Audio Muted:", STATE.audioMuted);
+        STATE.audioMuted
+          ? soundEngine.pauseAmbientMusic()
+          : soundEngine.playAmbientMusic();
         soundIcon.className = STATE.audioMuted
           ? "fa-solid fa-volume-xmark text-slate-500 text-lg"
           : "fa-solid fa-volume-high text-pink-400 text-lg";
