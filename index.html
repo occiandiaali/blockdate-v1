@@ -12,6 +12,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Socket.io for Multiplayer -->
+    <script
+      src="https://cdn.socket.io/4.8.4/socket.io.min.js"
+      integrity="sha384-fBrXvbDtHoeKWJ/hcA6M+YGueiDW+h45I7V6F2kD1S8bOkrF9rZYPLVkCR6BLR/1"
+      crossorigin="anonymous"
+    ></script>
     <!-- FontAwesome Icons -->
     <link
       rel="stylesheet"
@@ -353,10 +359,9 @@
               >Partner Identity</label
             >
             <input
-              id="user-email-input"
               type="email"
-              placeholder="Enter Magic Link Email..."
-              value="sweetheart@voxeldate.love"
+              id="emailInput"
+              placeholder="sweetheart@voxeldate.love"
               class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-pink-500 transition"
             />
           </div>
@@ -511,10 +516,101 @@
       </button>
     </div>
 
+    <!-- <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script> -->
+    <!-- <script
+      src="https://cdn.socket.io/4.8.4/socket.io.min.js"
+      integrity="sha384-fBrXvbDtHoeKWJ/hcA6M+YGueiDW+h45I7V6F2kD1S8bOkrF9rZYPLVkCR6BLR/1"
+      crossorigin="anonymous"
+    ></script> -->
     <script>
       /* =========================================================================
-       VOXEL LOVE - THREE.JS 3D VIRTUAL DATE GAME
-       ========================================================================= */
+         SOCKET.IO MULTIPLAYER SETUP
+         ========================================================================= */
+      let socket = null;
+      let isMultiplayerActive = false;
+
+      function connectSocketServer() {
+        try {
+          socket = io("http://localhost:3000", { autoConnect: false });
+
+          socket.connect();
+
+          socket.on("connect", () => {
+            console.log("Connected to Socket.io server with ID:", socket.id);
+          });
+
+          // Server sends list of connected players in this room
+          socket.on("roomState", (data) => {
+            console.log("Room state updated:", data);
+            if (data.players.length >= 2) {
+              isMultiplayerActive = true;
+            } else {
+              isMultiplayerActive = false;
+            }
+
+            // Sync or update remote avatar gender
+            const otherPlayer = data.players.find((p) => p.id !== socket.id);
+            if (otherPlayer && partnerAvatar) {
+              if (partnerAvatar.userData.gender !== otherPlayer.gender) {
+                scene.remove(partnerAvatar);
+                partnerAvatar = createCharacterMesh(otherPlayer.gender);
+                scene.add(partnerAvatar);
+              }
+            }
+          });
+
+          socket.on("dateStarted", (data) => {
+            console.log("Date started with 2 players! Timer:", data.countdown);
+            soundEngine.playChime();
+          });
+
+          socket.on("timerUpdate", (secondsLeft) => {
+            STATE.timeRemaining = secondsLeft;
+            const mins = Math.floor(secondsLeft / 60);
+            const secs = secondsLeft % 60;
+            timerDisplay.textContent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+          });
+
+          socket.on("playerMoved", (data) => {
+            if (partnerAvatar && data.transform) {
+              partnerAvatar.position.set(
+                data.transform.x,
+                data.transform.y,
+                data.transform.z,
+              );
+              partnerAvatar.rotation.y = data.transform.rotY;
+            }
+          });
+
+          socket.on("speechMessage", (data) => {
+            if (partnerAvatar) {
+              triggerSpeechBubble(partnerAvatar, data.text);
+            }
+          });
+
+          socket.on("playerLeft", (data) => {
+            console.log(`${data.playerName} has left the room:`, data);
+            isMultiplayerActive = false;
+            if (partnerAvatar) {
+              scene.remove(partnerAvatar);
+              partnerAvatar = null;
+            }
+          });
+
+          socket.on("meetingEnded", () => {
+            triggerDateOver();
+          });
+
+          socket.on("roomFull", (data) => {
+            alert(data.message || "Room is full.");
+            window.location.reload();
+          });
+        } catch (err) {
+          console.warn(
+            "Socket.io server offline. Running in local companion mode.",
+          );
+        }
+      }
 
       // App State Configuration
       const STATE = {
@@ -550,6 +646,8 @@
       let joystickOrigin = { x: 0, y: 0 };
       let joystickMove = { x: 0, y: 0 };
 
+      // let standAlonePeerMode = true; // For testing without Socket server
+
       //----------------
 
       // Date Prompts Data
@@ -566,6 +664,7 @@
       // DOM Elements
       const welcomeModal = document.getElementById("welcome-modal");
       const dateRoomID = document.getElementById("dateroom-id");
+
       const hud = document.getElementById("hud");
       const joystickContainer = document.getElementById("joystick-container");
       const joystickKnob = document.getElementById("joystick-knob");
@@ -596,11 +695,13 @@
       const dateOverExitBtn = document.getElementById("date-over-exit-btn");
       const genRoomBtn = document.getElementById("gen-room-btn");
       const roomIdInput = document.getElementById("room-id-input");
+      const emailInput = document.getElementById("emailInput");
 
       // Web Audio Synthesizer for Romantic Ambiance & Sound Effects
-      const listener = new THREE.AudioListener();
-      const ambientSound = new THREE.Audio(listener);
+      const ambientListener = new THREE.AudioListener();
+      const ambientSound = new THREE.Audio(ambientListener);
       const audioLoader = new THREE.AudioLoader();
+
       class SoundEngine {
         constructor() {
           this.ctx = null;
@@ -656,19 +757,7 @@
 
         startAmbientMusic() {
           if (!this.ctx) return;
-          // Subtle ambient soothing synth pad
-          /*   const chords = [261.63, 329.63, 392.0, 493.88]; // Cmaj7
-          chords.forEach((freq) => {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            osc.type = "sine";
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.015, this.ctx.currentTime);
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.start();
-          }); */
-          camera.add(listener);
+          //  camera.add(listener);
           audioLoader.load("assets/sounds/ambient1.mp3", function (buffer) {
             ambientSound.setBuffer(buffer);
             ambientSound.setLoop(true);
@@ -753,8 +842,9 @@
       const speechHandler = new SpeechHandler();
 
       // Three.js Scene Setup
-
       function initThreeScene() {
+        if (scene) return; // Prevent re-initialization
+
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0f172a);
         scene.fog = new THREE.FogExp2(0x0f172a, 0.035);
@@ -765,6 +855,7 @@
           0.1,
           1000,
         );
+        camera.add(ambientListener);
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -774,9 +865,9 @@
         document.body.appendChild(renderer.domElement);
 
         clock = new THREE.Clock();
-        // added lately
-        soundEngine.init();
-        soundEngine.playChime();
+        // // Trigger the sound engine to initialize and play a chime when the scene is ready & begin playing ambient music
+        // soundEngine.init();
+        // soundEngine.playChime();
 
         // Lighting Setup
         const ambientLight = new THREE.AmbientLight(0xd8b4fe, 0.6); // Romantic warm purple tone
@@ -1333,6 +1424,19 @@
           u.rightArm.rotation.x = -Math.sin(u.walkTime) * 0.6;
           u.leftLeg.rotation.x = -Math.sin(u.walkTime) * 0.6;
           u.rightLeg.rotation.x = Math.sin(u.walkTime) * 0.6;
+
+          // Emit position to socket server
+          if (socket && socket.connected) {
+            socket.emit("playerMove", {
+              roomId: roomIdInput.value || "LOVEDATE",
+              transform: {
+                x: playerAvatar.position.x,
+                y: playerAvatar.position.y,
+                z: playerAvatar.position.z,
+                rotY: playerAvatar.rotation.y,
+              },
+            });
+          }
         } else {
           // Idle Animation
           const u = playerAvatar.userData;
@@ -1378,7 +1482,12 @@
 
       function syncPeerSpeech(text) {
         // In standalone peer mode, simulate partner echoing occasional romantic responses
-        if (Math.random() < 0.3) {
+        if (socket && socket.connected) {
+          socket.emit("speechMessage", {
+            roomId: roomIdInput.value || "LOVEDATE",
+            text,
+          });
+        } else if (!isMultiplayerActive) {
           setTimeout(() => {
             const companionReplies = [
               "You look so cute in voxel form!",
@@ -1393,32 +1502,56 @@
             triggerSpeechBubble(partnerAvatar, reply);
           }, 2000);
         }
+        // if (standAlonePeerMode && Math.random() < 0.3) {
+        //   setTimeout(() => {
+        //     const companionReplies = [
+        //       "You look so cute in voxel form!",
+        //       "I love exploring this world with you! ❤️",
+        //       "Look at the glowing heart monument over there!",
+        //       "I'm so happy we get to have this date.",
+        //     ];
+        //     const reply =
+        //       companionReplies[
+        //         Math.floor(Math.random() * companionReplies.length)
+        //       ];
+        //     triggerSpeechBubble(partnerAvatar, reply);
+        //   }, 2000);
+        // }
       }
 
-      function startTimer() {
-        STATE.timeRemaining = 120; //600;
-        clearInterval(STATE.timerInterval);
-
-        STATE.timerInterval = setInterval(() => {
-          STATE.timeRemaining--;
-          const mins = Math.floor(STATE.timeRemaining / 60);
-          const secs = STATE.timeRemaining % 60;
-          timerDisplay.textContent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-
-          if (STATE.timeRemaining <= 0) {
-            clearInterval(STATE.timerInterval);
-            soundEngine.stopAmbientMusic();
-            // Display "Date Over" Overlay
-            document
-              .getElementById("date-over-screen")
-              .classList.remove("hidden");
-            welcomeModal.classList.remove("hidden");
-            // alert(
-            //   "Your Virtual Date session has concluded! Thank you for sharing this romantic moment together.",
-            // );
-          }
-        }, 1000);
+      // Run when the session time expires
+      function triggerDateOver() {
+        document.getElementById("date-over-screen").classList.remove("hidden");
+        hud.classList.add("hidden");
+        soundEngine.stopAmbientMusic();
+        socket.disconnect();
       }
+
+      // function startTimer() {
+      //   STATE.timeRemaining = 120; //600;
+      //   clearInterval(STATE.timerInterval);
+
+      //   STATE.timerInterval = setInterval(() => {
+      //     STATE.timeRemaining--;
+      //     const mins = Math.floor(STATE.timeRemaining / 60);
+      //     const secs = STATE.timeRemaining % 60;
+      //     timerDisplay.textContent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+
+      //     if (STATE.timeRemaining <= 0) {
+      //       clearInterval(STATE.timerInterval);
+      //       soundEngine.stopAmbientMusic();
+      //       socket.disconnect(); //=============
+      //       // Display "Date Over" Overlay
+      //       document
+      //         .getElementById("date-over-screen")
+      //         .classList.remove("hidden");
+      //       welcomeModal.classList.remove("hidden");
+      //       // alert(
+      //       //   "Your Virtual Date session has concluded! Thank you for sharing this romantic moment together.",
+      //       // );
+      //     }
+      //   }, 1000);
+      // }
 
       // UI Event Listeners
       selectFemaleBtn.addEventListener("click", () => {
@@ -1446,29 +1579,53 @@
         welcomeModal.classList.add("hidden");
         hud.classList.remove("hidden");
 
-        // soundEngine.init();
-        // soundEngine.playChime();
+        console.log("Date started with gender:", STATE.gender);
+        console.log("Room ID:", roomIdInput.value);
+        dateRoomID.innerText = roomIdInput.value || "LOVEDATE";
+        console.log("Email:", emailInput.value || "Anonymous email");
+
+        // Trigger the sound engine to initialize and play a chime when the scene is ready & begin playing ambient music
+        soundEngine.init();
+        soundEngine.playChime();
 
         initThreeScene();
-        startTimer();
+        //startTimer();
+        connectSocketServer();
+
+        if (socket) {
+          console.log("Connected to server with ID:", socket.id);
+          socket.emit("joinRoom", {
+            roomId: roomIdInput.value || "LOVEDATE",
+            playerName: emailInput.value || "Anonymous",
+            gender: STATE.gender,
+          });
+        }
+
         animate();
       });
 
       endDateBtn.addEventListener("click", () => {
         if (confirm("Are you sure you want to end the date early?")) {
-          clearInterval(STATE.timerInterval);
+          //  clearInterval(STATE.timerInterval);
           soundEngine.stopAmbientMusic();
-          // // Display "Date Over" Overlay
-          // document
-          //   .getElementById("date-over-screen")
-          //   .classList.remove("hidden");
+
           welcomeModal.classList.remove("hidden");
+          hud.classList.add("hidden");
+
+          if (socket) {
+            socket.emit("leaveRoom", {
+              roomId: roomIdInput.value || "LOVEDATE",
+              playerName: emailInput.value || "Anonymous",
+            });
+            socket.disconnect();
+          }
         }
       });
 
       dateOverExitBtn.addEventListener("click", () => {
         document.getElementById("date-over-screen").classList.add("hidden");
         welcomeModal.classList.remove("hidden");
+        if (socket) socket.disconnect();
       });
 
       // Mic Toggle
@@ -1490,7 +1647,7 @@
       // Sound Toggle
       soundToggleBtn.addEventListener("click", () => {
         STATE.audioMuted = !STATE.audioMuted;
-        console.log("Audio Muted:", STATE.audioMuted);
+        // console.log("Audio Muted:", STATE.audioMuted);
         STATE.audioMuted
           ? soundEngine.pauseAmbientMusic()
           : soundEngine.playAmbientMusic();
