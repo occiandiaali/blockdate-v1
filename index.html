@@ -56,7 +56,8 @@
       /* Joystick styling */
       #joystick-container {
         position: absolute;
-        bottom: 24px;
+        /*bottom: 24px;*/
+        bottom: 32px;
         left: 24px;
         width: 120px;
         height: 120px;
@@ -203,7 +204,7 @@
             class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-3 rounded-2xl shadow-lg transition active:scale-95 text-xs font-bold"
           >
             <i class="fa-solid fa-right-from-bracket mr-1"></i>
-            <span>End Date</span>
+            <span class="hidden">End Date</span>
           </button>
         </div>
       </div>
@@ -267,7 +268,8 @@
         class="w-14 h-14 bg-slate-900/80 backdrop-blur-md border border-purple-500/40 text-purple-300 rounded-full font-bold shadow-xl flex items-center justify-center text-xl active:scale-90 transition"
         title="Toggle Camera Pan"
       >
-        <i id="look-icon" class="fa-solid fa-eye"></i>
+        <!-- <i id="look-icon" class="fa-solid fa-eye"></i> -->
+        <i class="fa-solid fa-street-view"></i>
       </button>
       <button
         id="jump-btn"
@@ -1695,17 +1697,17 @@
           }
 
           const lookBtn = document.getElementById("mobile-look-btn");
-          const lookIcon = document.getElementById("look-icon");
+          // const lookIcon = document.getElementById("look-icon");
           if (lookBtn) {
             lookBtn.addEventListener("touchstart", (e) => {
               e.preventDefault();
               isPanMode = !isPanMode;
               if (isPanMode) {
                 lookBtn.classList.add("bg-purple-600", "text-white");
-                lookIcon.className = "fa-solid fa-eye-slash";
+                // lookIcon.className = "fa-solid fa-eye-slash";
               } else {
                 lookBtn.classList.remove("bg-purple-600", "text-white");
-                lookIcon.className = "fa-solid fa-eye";
+                // lookIcon.className = "fa-solid fa-eye";
               }
             });
 
