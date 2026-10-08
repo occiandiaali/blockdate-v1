@@ -6,7 +6,8 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>Voxel Love - Virtual 3D Date World</title>
+    <link rel="icon" type="image/svg+xml" href="assets/images/logo.svg" />
+    <title>Block Date - Virtual 3D Date World</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -178,6 +179,25 @@
         margin-bottom: 30px;
         line-height: 1.5;
       }
+
+      /**Experience ratings */
+      .rating {
+        display: flex;
+      }
+
+      .rating input {
+        display: none; /* Hide the radio buttons */
+      }
+
+      .rating label {
+        font-size: 30px; /* Size of the stars */
+        color: gray; /* Default color */
+        cursor: pointer; /* Pointer cursor on hover */
+      }
+
+      .rating input:checked ~ label {
+        color: orange; /* Color of selected stars */
+      }
     </style>
   </head>
   <body class="relative">
@@ -192,7 +212,7 @@
         <div
           class="bg-slate-900/80 backdrop-blur-md border border-pink-500/30 rounded-2xl p-3 sm:p-4 shadow-xl flex items-center space-x-4"
         >
-          <span id="gold-bars" class="text-xs">🧈</span>
+          <span id="gold-bars" class="flex flex-row text-xs">🧈</span>
           <div
             class="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-xl"
           >
@@ -381,20 +401,20 @@
           <option value="3">300</option>
         </select>
       </form> -->
-          <div class="max-w-sm mx-auto" id="budget-selection">
+          <div class="max-w-sm mx-auto">
             <label
-              for="options"
+              for="budget-options"
               class="block mb-2.5 text-sm font-medium text-heading"
               >Select your budget</label
             >
             <select
-              id="options"
+              id="budget-options"
               class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-pink-500 transition"
             >
               <option selected>Gold bars to spend</option>
-              <option value="1">100</option>
-              <option value="2">200</option>
-              <option value="3">300</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="300">300</option>
             </select>
           </div>
 
@@ -527,15 +547,29 @@
 
     <!-- "Date Over" Summary Screen Overlay -->
     <div class="screen-overlay hidden" id="date-over-screen">
-      <h1>Date Over!</h1>
-      <p>Time's up! Here is a summary of your speed dating session:</p>
+      <h1>Time Up!</h1>
+      <p>Here is a summary of your speed dating session:</p>
 
       <div class="stats-card">
         <div class="stat-row">
           <span class="stat-label">Duration</span>
           <span class="stat-value" id="stat-duration">03:00</span>
         </div>
-        <p>Rate your date experience</p>
+      </div>
+      <div class="flex justify-center mt-2 mb-4">
+        <h3>Rate your date experience</h3>
+        <div class="rating">
+          <input id="rating1" type="radio" name="rating" value="1" />
+          <label for="rating1">★</label>
+          <input id="rating2" type="radio" name="rating" value="2" />
+          <label for="rating2">★</label>
+          <input id="rating3" type="radio" name="rating" value="3" />
+          <label for="rating3">★</label>
+          <input id="rating4" type="radio" name="rating" value="4" />
+          <label for="rating4">★</label>
+          <input id="rating5" type="radio" name="rating" value="5" />
+          <label for="rating5">★</label>
+        </div>
       </div>
 
       <button
@@ -728,7 +762,7 @@
       const roomIdInput = document.getElementById("room-id-input");
       //const emailInput = document.getElementById("emailInput");
       const usernameInput = document.getElementById("usernameInput");
-      const budgetSelection = document.getElementById("budget-selection");
+      const budgetOptions = document.getElementById("budget-options");
       const goldBarsDisplay = document.getElementById("gold-bars");
 
       // Web Audio Synthesizer for Romantic Ambiance & Sound Effects
@@ -1406,13 +1440,145 @@
         }
       }
 
+      // AABB Collision Detection against Voxel Blocks
+      function checkVoxelCollisions(position, radius = 0.3, height = 1.6) {
+        // Define player bounding box
+        const playerMinX = position.x - radius;
+        const playerMaxX = position.x + radius;
+        const playerMinY = position.y; // Feet level
+        const playerMaxY = position.y + height; // Head level
+        const playerMinZ = position.z - radius;
+        const playerMaxZ = position.z + radius;
+
+        // Check collision against all world blocks
+        for (let i = 0; i < worldBlocks.length; i++) {
+          const block = worldBlocks[i];
+          const bPos = block.position;
+          const halfSize = BLOCK_SIZE / 2; // 0.5 for 1x1x1 blocks
+
+          const blockMinX = bPos.x - halfSize;
+          const blockMaxX = bPos.x + halfSize;
+          const blockMinY = bPos.y - halfSize;
+          const blockMaxY = bPos.y + halfSize;
+          const blockMinZ = bPos.z - halfSize;
+          const blockMaxZ = bPos.z + halfSize;
+
+          // Check overlap on all 3 axes
+          if (
+            playerMaxX > blockMinX &&
+            playerMinX < blockMaxX &&
+            playerMaxY > blockMinY &&
+            playerMinY < blockMaxY &&
+            playerMaxZ > blockMinZ &&
+            playerMinZ < blockMaxZ
+          ) {
+            return { colliding: true, blockMaxY: blockMaxY, block: block };
+          }
+        }
+
+        return { colliding: false };
+      }
+
+      // function updatePhysics(delta) {
+      //   if (!playerAvatar) return;
+
+      //   // Apply Gravity
+      //   playerVelocity.y -= 22 * delta;
+
+      //   // Calculate Movement Input Vector
+      //   moveVector.set(0, 0, 0);
+
+      //   if (STATE.isMobile) {
+      //     moveVector.x = joystickMove.x;
+      //     moveVector.z = joystickMove.y;
+      //   } else {
+      //     if (keys.w) moveVector.z -= 1;
+      //     if (keys.s) moveVector.z += 1;
+      //     if (keys.a) moveVector.x -= 1;
+      //     if (keys.d) moveVector.x += 1;
+      //     moveVector.normalize();
+      //   }
+
+      //   // Rotate move vector based on Camera Yaw
+      //   const moveRotated = moveVector
+      //     .clone()
+      //     .applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+      //   const speed = 5.5;
+
+      //   playerAvatar.position.x += moveRotated.x * speed * delta;
+      //   playerAvatar.position.z += moveRotated.z * speed * delta;
+      //   playerAvatar.position.y += playerVelocity.y * delta;
+
+      //   // Simple Terrain Floor Collision
+      //   const floorY = 1.0;
+      //   if (playerAvatar.position.y <= floorY) {
+      //     playerAvatar.position.y = floorY;
+      //     playerVelocity.y = 0;
+      //     isGrounded = true;
+      //   } else {
+      //     isGrounded = false;
+      //   }
+
+      //   // Rotate Avatar towards movement direction
+      //   if (moveVector.lengthSq() > 0.01) {
+      //     const moveAngle = Math.atan2(moveRotated.x, moveRotated.z);
+      //     playerAvatar.rotation.y = moveAngle;
+
+      //     // Walking Animation
+      //     const u = playerAvatar.userData;
+      //     u.walkTime += delta * 12;
+      //     u.leftArm.rotation.x = Math.sin(u.walkTime) * 0.6;
+      //     u.rightArm.rotation.x = -Math.sin(u.walkTime) * 0.6;
+      //     u.leftLeg.rotation.x = -Math.sin(u.walkTime) * 0.6;
+      //     u.rightLeg.rotation.x = Math.sin(u.walkTime) * 0.6;
+
+      //     // Emit position to socket server
+      //     if (socket && socket.connected) {
+      //       socket.emit("playerMove", {
+      //         roomId: roomIdInput.value || "LOVEDATE",
+      //         transform: {
+      //           x: playerAvatar.position.x,
+      //           y: playerAvatar.position.y,
+      //           z: playerAvatar.position.z,
+      //           rotY: playerAvatar.rotation.y,
+      //         },
+      //       });
+      //     }
+      //   } else {
+      //     // Idle Animation
+      //     const u = playerAvatar.userData;
+      //     u.leftArm.rotation.x = 0;
+      //     u.rightArm.rotation.x = 0;
+      //     u.leftLeg.rotation.x = 0;
+      //     u.rightLeg.rotation.x = 0;
+      //   }
+
+      //   // Smooth Third-Person Camera Follow
+      //   const targetCamPos = playerAvatar.position
+      //     .clone()
+      //     .add(
+      //       new THREE.Vector3(
+      //         Math.sin(yaw) * Math.cos(pitch) * 6,
+      //         Math.sin(pitch) * 6 + 2.5,
+      //         Math.cos(yaw) * Math.cos(pitch) * 6,
+      //       ),
+      //     );
+
+      //   camera.position.lerp(targetCamPos, delta * 8);
+      //   camera.lookAt(
+      //     playerAvatar.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
+      //   );
+
+      //   // Simulate Partner Idle Companion Movement
+      //   simulatePartnerBehavior(delta);
+      // }
       function updatePhysics(delta) {
         if (!playerAvatar) return;
 
-        // Apply Gravity
+        // 1. Apply Gravity
         playerVelocity.y -= 22 * delta;
 
-        // Calculate Movement Input Vector
+        // 2. Calculate Movement Input Vector
         moveVector.set(0, 0, 0);
 
         if (STATE.isMobile) {
@@ -1426,27 +1592,68 @@
           moveVector.normalize();
         }
 
-        // Rotate move vector based on Camera Yaw
+        // Rotate input vector by camera yaw
         const moveRotated = moveVector
           .clone()
           .applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
         const speed = 5.5;
 
-        playerAvatar.position.x += moveRotated.x * speed * delta;
-        playerAvatar.position.z += moveRotated.z * speed * delta;
-        playerAvatar.position.y += playerVelocity.y * delta;
+        const currentPos = playerAvatar.position.clone();
+        const radius = 0.3; // Half-width of character
+        const height = 1.6; // Character height
 
-        // Simple Terrain Floor Collision
-        const floorY = 1.0;
-        if (playerAvatar.position.y <= floorY) {
-          playerAvatar.position.y = floorY;
-          playerVelocity.y = 0;
-          isGrounded = true;
-        } else {
-          isGrounded = false;
+        // -----------------------------------------------------------
+        // 3. HORIZONTAL MOVEMENT WITH BLOCK COLLISION (X & Z)
+        // -----------------------------------------------------------
+
+        // Try X movement first
+        const nextPosX = currentPos.clone();
+        nextPosX.x += moveRotated.x * speed * delta;
+        if (!checkVoxelCollisions(nextPosX, radius, height).colliding) {
+          playerAvatar.position.x = nextPosX.x;
         }
 
-        // Rotate Avatar towards movement direction
+        // Try Z movement next
+        const nextPosZ = playerAvatar.position.clone();
+        nextPosZ.z += moveRotated.z * speed * delta;
+        if (!checkVoxelCollisions(nextPosZ, radius, height).colliding) {
+          playerAvatar.position.z = nextPosZ.z;
+        }
+
+        // -----------------------------------------------------------
+        // 4. VERTICAL MOVEMENT & GROUND COLLISION (Y)
+        // -----------------------------------------------------------
+        const nextPosY = playerAvatar.position.clone();
+        nextPosY.y += playerVelocity.y * delta;
+
+        const colY = checkVoxelCollisions(nextPosY, radius, height);
+
+        if (colY.colliding) {
+          if (playerVelocity.y < 0) {
+            // Landing on top of a block
+            playerAvatar.position.y = colY.blockMaxY; // Snap feet to top surface (0.5 for ground block)
+            playerVelocity.y = 0;
+            isGrounded = true;
+          } else if (playerVelocity.y > 0) {
+            // Hitting ceiling block from underneath
+            playerVelocity.y = 0;
+          }
+        } else {
+          // Check baseline ground level (for empty air at bottom of world)
+          const baselineY = 0.5; // Feet exact level on top of y=0 block
+          if (nextPosY.y <= baselineY) {
+            playerAvatar.position.y = baselineY;
+            playerVelocity.y = 0;
+            isGrounded = true;
+          } else {
+            playerAvatar.position.y = nextPosY.y;
+            isGrounded = false;
+          }
+        }
+
+        // -----------------------------------------------------------
+        // 5. ANIMATIONS & MULTIPLAYER BROADCAST
+        // -----------------------------------------------------------
         if (moveVector.lengthSq() > 0.01) {
           const moveAngle = Math.atan2(moveRotated.x, moveRotated.z);
           playerAvatar.rotation.y = moveAngle;
@@ -1459,7 +1666,7 @@
           u.leftLeg.rotation.x = -Math.sin(u.walkTime) * 0.6;
           u.rightLeg.rotation.x = Math.sin(u.walkTime) * 0.6;
 
-          // Emit position to socket server
+          // Emit position update to socket server
           if (socket && socket.connected) {
             socket.emit("playerMove", {
               roomId: roomIdInput.value || "LOVEDATE",
@@ -1480,7 +1687,9 @@
           u.rightLeg.rotation.x = 0;
         }
 
-        // Smooth Third-Person Camera Follow
+        // -----------------------------------------------------------
+        // 6. THIRD-PERSON CAMERA FOLLOW
+        // -----------------------------------------------------------
         const targetCamPos = playerAvatar.position
           .clone()
           .add(
@@ -1496,7 +1705,7 @@
           playerAvatar.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
         );
 
-        // Simulate Partner Idle Companion Movement
+        // Simulate Partner Companion Facing Motion
         simulatePartnerBehavior(delta);
       }
 
@@ -1555,6 +1764,8 @@
 
       // Run when the session time expires
       function triggerDateOver() {
+        document.getElementById("stat-duration").textContent =
+          STATE.timeRemaining;
         document.getElementById("date-over-screen").classList.remove("hidden");
         hud.classList.add("hidden");
         soundEngine.stopAmbientMusic();
@@ -1625,7 +1836,8 @@
         initThreeScene();
         //startTimer();
         connectSocketServer();
-        goldBarsDisplay.textContent = `${STATE.budget}🧈`;
+        STATE.budget = budgetOptions.value;
+        goldBarsDisplay.innerText = `${STATE.budget}🧈`;
         console.log("Initial Budget:", STATE.budget);
 
         if (socket) {
@@ -1664,6 +1876,7 @@
         document.getElementById("date-over-screen").classList.add("hidden");
         welcomeModal.classList.remove("hidden");
         if (socket) socket.disconnect();
+        window.location.reload();
       });
 
       // Mic Toggle
