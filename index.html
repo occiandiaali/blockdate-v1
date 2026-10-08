@@ -595,7 +595,11 @@
 
       function connectSocketServer() {
         try {
-          socket = io("http://localhost:3000", { autoConnect: false });
+          //socket = io("http://localhost:3000", { autoConnect: false });
+          //https://blockdate-server.onrender.com/
+          socket = io("https://blockdate-server.onrender.com", {
+            autoConnect: false,
+          });
 
           socket.connect();
 
