@@ -475,6 +475,23 @@
           Your time limit for this virtual date session has expired! Thank you
           for sharing this romantic moment.
         </p>
+        <h3 class="pixel-font text-lg text-pink-300 mb-1">
+          Please, rate your experience before you exit.
+        </h3>
+        <div class="mt-2 mb-4">
+          <div class="rating">
+            <input id="rating1" type="radio" name="rating" value="1" />
+            <label for="rating1">★</label>
+            <input id="rating2" type="radio" name="rating" value="2" />
+            <label for="rating2">★</label>
+            <input id="rating3" type="radio" name="rating" value="3" />
+            <label for="rating3">★</label>
+            <input id="rating4" type="radio" name="rating" value="4" />
+            <label for="rating4">★</label>
+            <input id="rating5" type="radio" name="rating" value="5" />
+            <label for="rating5">★</label>
+          </div>
+        </div>
         <button
           id="date-over-exit-btn"
           class="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold py-3 rounded-xl shadow-lg hover:opacity-95 transition"
@@ -726,7 +743,7 @@
           audioLoader.load("assets/sounds/ambient1.mp3", function (buffer) {
             ambientSound.setBuffer(buffer);
             ambientSound.setLoop(true);
-            ambientSound.setVolume(0.2);
+            ambientSound.setVolume(0.8);
             ambientSound.play();
           });
         }
@@ -1746,6 +1763,8 @@
       function triggerDateOver() {
         document.getElementById("date-over-screen").classList.remove("hidden");
         hud.classList.add("hidden");
+        soundEngine.stopAmbientMusic();
+        socket.disconnect();
       }
 
       /* =========================================================================
