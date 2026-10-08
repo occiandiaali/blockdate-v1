@@ -399,7 +399,6 @@ function createFlower(x, y, z) {
   flower.position.set(x, y + 0.25, z);
   scene.add(flower);
   worldBlocks.push(flower);
-  solidObstacles.push(flower);
 }
 
 function createHeartMonument(x, y, z) {
@@ -429,7 +428,6 @@ function createHeartMonument(x, y, z) {
         block.castShadow = true;
         scene.add(block);
         worldBlocks.push(block);
-        solidObstacles.push(block);
       }
     }
   }
