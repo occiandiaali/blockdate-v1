@@ -427,7 +427,6 @@ function createHeartMonument(x, y, z) {
         );
         block.castShadow = true;
         scene.add(block);
-        worldBlocks.push(block);
       }
     }
   }
