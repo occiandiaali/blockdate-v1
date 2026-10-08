@@ -192,6 +192,7 @@
         <div
           class="bg-slate-900/80 backdrop-blur-md border border-pink-500/30 rounded-2xl p-3 sm:p-4 shadow-xl flex items-center space-x-4"
         >
+          <span id="gold-bars" class="text-xs">🧈</span>
           <div
             class="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-xl"
           >
@@ -358,12 +359,43 @@
               class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2"
               >Partner Identity</label
             >
-            <input
+            <!-- <input
               type="email"
               id="emailInput"
               placeholder="sweetheart@voxeldate.love"
               class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-pink-500 transition"
+            /> -->
+            <input
+              id="usernameInput"
+              placeholder="What should we call you?"
+              class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-pink-500 transition"
             />
+          </div>
+          <!-- Budget selection-->
+          <!-- <form class="max-w-sm mx-auto">
+        <label for="options" class="block mb-2.5 text-sm font-medium text-heading">Select an option</label>
+        <select id="options" class="block w-full px-3 py-2.5 bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body">
+          <option selected>Your Budget</option>
+          <option value="1">100</option>
+          <option value="2">200</option>
+          <option value="3">300</option>
+        </select>
+      </form> -->
+          <div class="max-w-sm mx-auto" id="budget-selection">
+            <label
+              for="options"
+              class="block mb-2.5 text-sm font-medium text-heading"
+              >Select your budget</label
+            >
+            <select
+              id="options"
+              class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-pink-500 transition"
+            >
+              <option selected>Gold bars to spend</option>
+              <option value="1">100</option>
+              <option value="2">200</option>
+              <option value="3">300</option>
+            </select>
           </div>
 
           <div>
@@ -449,9 +481,7 @@
         >
           <div class="flex items-center space-x-2 text-pink-400">
             <i class="fa-solid fa-server text-xl"></i>
-            <h2 class="font-bold text-lg text-white">
-              Colyseus.js Backend Room Code
-            </h2>
+            <h2 class="font-bold text-lg text-white">Date Room Instructions</h2>
           </div>
           <button
             id="close-code-modal"
@@ -624,6 +654,7 @@
         timerInterval: null,
         peerConnected: false,
         typewriterQueue: [],
+        budget: 0,
       };
 
       // Scene Variables
@@ -695,7 +726,10 @@
       const dateOverExitBtn = document.getElementById("date-over-exit-btn");
       const genRoomBtn = document.getElementById("gen-room-btn");
       const roomIdInput = document.getElementById("room-id-input");
-      const emailInput = document.getElementById("emailInput");
+      //const emailInput = document.getElementById("emailInput");
+      const usernameInput = document.getElementById("usernameInput");
+      const budgetSelection = document.getElementById("budget-selection");
+      const goldBarsDisplay = document.getElementById("gold-bars");
 
       // Web Audio Synthesizer for Romantic Ambiance & Sound Effects
       const ambientListener = new THREE.AudioListener();
@@ -1582,7 +1616,7 @@
         console.log("Date started with gender:", STATE.gender);
         console.log("Room ID:", roomIdInput.value);
         dateRoomID.innerText = roomIdInput.value || "LOVEDATE";
-        console.log("Email:", emailInput.value || "Anonymous email");
+        console.log("Username:", usernameInput.value || "Anonymous");
 
         // Trigger the sound engine to initialize and play a chime when the scene is ready & begin playing ambient music
         soundEngine.init();
@@ -1591,13 +1625,16 @@
         initThreeScene();
         //startTimer();
         connectSocketServer();
+        goldBarsDisplay.textContent = `${STATE.budget}🧈`;
+        console.log("Initial Budget:", STATE.budget);
 
         if (socket) {
-          console.log("Connected to server with ID:", socket.id);
+          // console.log("Connected to server with ID:", socket.id);
           socket.emit("joinRoom", {
             roomId: roomIdInput.value || "LOVEDATE",
-            playerName: emailInput.value || "Anonymous",
+            playerName: usernameInput.value || "Anonymous",
             gender: STATE.gender,
+            budget: STATE.budget,
           });
         }
 
@@ -1615,7 +1652,8 @@
           if (socket) {
             socket.emit("leaveRoom", {
               roomId: roomIdInput.value || "LOVEDATE",
-              playerName: emailInput.value || "Anonymous",
+              playerName: usernameInput.value || "Anonymous",
+              budget: STATE.budget,
             });
             socket.disconnect();
           }
