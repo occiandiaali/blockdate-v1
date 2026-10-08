@@ -130,6 +130,25 @@
           transform: translate(-50%, -100%);
         }
       }
+
+      /**Experience ratings */
+      .rating {
+        display: flex;
+      }
+
+      .rating input {
+        display: none; /* Hide the radio buttons */
+      }
+
+      .rating label {
+        font-size: 30px; /* Size of the stars */
+        color: gray; /* Default color */
+        cursor: pointer; /* Pointer cursor on hover */
+      }
+
+      .rating input:checked ~ label {
+        color: orange; /* Color of selected stars */
+      }
     </style>
   </head>
 
@@ -667,6 +686,15 @@
 
           socket.on("speechMessage", (data) => {
             if (partnerAvatar) triggerSpeechBubble(partnerAvatar, data.text);
+          });
+
+          socket.on("playerLeft", (data) => {
+            console.log(`${data.playerName} has left the room:`, data);
+            isMultiplayerActive = false;
+            if (partnerAvatar) {
+              scene.remove(partnerAvatar);
+              partnerAvatar = null;
+            }
           });
 
           socket.on("meetingEnded", () => triggerDateOver());
