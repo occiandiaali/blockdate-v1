@@ -547,7 +547,7 @@
 
     <!-- "Date Over" Summary Screen Overlay -->
     <div class="screen-overlay hidden" id="date-over-screen">
-      <h1>Time Up!</h1>
+      <h1 class="pixel-font text-2xl text-pink-500 mb-1">Time Up!</h1>
       <!-- <p>Here is a summary of your speed dating session:</p>
 
       <div class="stats-card">
@@ -556,8 +556,10 @@
           <span class="stat-value" id="stat-duration">03:00</span>
         </div>
       </div> -->
-      <div class="flex flex-col justify-center mt-2 mb-4 stats-card">
-        <h3>Please, rate your experience</h3>
+      <h3 class="pixel-font text-lg text-pink-300 mb-1">
+        Please, rate your experience
+      </h3>
+      <div class="mt-2 mb-4">
         <div class="rating">
           <input id="rating1" type="radio" name="rating" value="1" />
           <label for="rating1">★</label>
@@ -1840,7 +1842,7 @@
         initThreeScene();
         //startTimer();
         connectSocketServer();
-        STATE.budget = budgetOptions.value;
+        STATE.budget = budgetOptions.value || 0;
         goldBarsDisplay.innerText = `${STATE.budget}🧈`;
         console.log("Initial Budget:", STATE.budget);
 
