@@ -1281,12 +1281,14 @@
         playerAvatar = createCharacterMesh(STATE.gender);
         playerAvatar.position.set(-1.5, 1, 1.5);
         scene.add(playerAvatar);
+        worldBlocks.push(playerAvatar); // For collision detection
 
         // Partner Avatar
         STATE.partnerGender = STATE.gender === "female" ? "male" : "female";
         partnerAvatar = createCharacterMesh(STATE.partnerGender);
         partnerAvatar.position.set(1.5, 0.5, 1.5);
         scene.add(partnerAvatar);
+        worldBlocks.push(partnerAvatar); // For collision detection
       }
 
       // Overhead Speech Bubble Manager
